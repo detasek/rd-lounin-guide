@@ -661,6 +661,21 @@ function updateDocumentUnsortedTargetOptions() {
   }
 }
 
+function updateDocumentVisibleTargetOptions() {
+  const select = document.getElementById('document-visible-target');
+  if (!select) return;
+  const currentValue = select.value;
+  const preferredValue = currentValue || lastManualDocumentProductId || selectedProductId || '';
+  select.innerHTML = buildProductOptions(preferredValue);
+  if (currentValue && Array.from(select.options).some((option) => option.value === currentValue)) {
+    select.value = currentValue;
+  } else if (lastManualDocumentProductId && Array.from(select.options).some((option) => Number(option.value) === Number(lastManualDocumentProductId))) {
+    select.value = String(lastManualDocumentProductId);
+  } else if (selectedProductId && Array.from(select.options).some((option) => Number(option.value) === Number(selectedProductId))) {
+    select.value = String(selectedProductId);
+  }
+}
+
 function setDocumentStatus(message, kind = '') {
   const el = document.getElementById('documentStatus');
   if (!el) return;
@@ -829,7 +844,7 @@ async function loadDocuments() {
 
   if (summaryEl) {
     summaryEl.textContent =
-      `Documents: ${docs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | scope: ${documentScope} | filtr: ${documentFilter} | hledani: ${documentSearch || '-'} | razeni: ${documentSort}`;
+      `Documents: ${docs.length} | viditelne: ${visibleDocs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | scope: ${documentScope} | filtr: ${documentFilter} | hledani: ${documentSearch || '-'} | razeni: ${documentSort}`;
   }
 
   if (suggestionsEl) {
@@ -969,6 +984,7 @@ async function loadDocuments() {
   updateDocumentFilterButtons();
   updateDocumentScopeButtons();
   updateDocumentUnsortedTargetOptions();
+  updateDocumentVisibleTargetOptions();
   const sortSelect = document.getElementById('documentSort');
   if (sortSelect && sortSelect.value !== documentSort) sortSelect.value = documentSort;
 }
@@ -1072,6 +1088,49 @@ async function moveAllUnsortedDocuments() {
   await loadSelectedProductSummary();
   const targetName = productsMap[targetProductId] || 'vybraneho produktu';
   setDocumentStatus(`Zarazeno bez navrhu do ${targetName}: ${moved}.`, 'ok');
+}
+
+async function moveVisibleDocumentsToTarget() {
+  const select = document.getElementById('document-visible-target');
+  const targetProductId = select?.value;
+
+  if (!targetProductId) {
+    setDocumentStatus('MISS: vyber cilovy produkt pro viditelne dokumenty', 'miss');
+    return;
+  }
+
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const visibleDocs = getVisibleDocumentsForCurrentView(docs)
+    .filter((doc) => Number(doc.product_id) !== Number(targetProductId));
+
+  if (!visibleDocs.length) {
+    setDocumentStatus('Zadne viditelne dokumenty k zarazeni.', 'ok');
+    return;
+  }
+
+  lastManualDocumentProductId = Number(targetProductId);
+  let moved = 0;
+
+  for (const doc of visibleDocs) {
+    const response = await fetch(`${API_BASE}/documents/${doc.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: doc.name,
+        product_id: targetProductId
+      })
+    });
+    await parseJsonResponse(response, `PUT /documents/${doc.id}`);
+    moved += 1;
+  }
+
+  await loadDocuments();
+  await loadProducts();
+  await loadSelectedProductSummary();
+  const targetName = productsMap[targetProductId] || 'vybraneho produktu';
+  setDocumentStatus(`Zarazeno viditelne do ${targetName}: ${moved}.`, 'ok');
 }
 
 async function moveSuggestedDocumentsToProduct(productId, productName) {
