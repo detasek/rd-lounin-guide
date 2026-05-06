@@ -594,6 +594,10 @@ Stage 2 – STRUKTURA
   - `Projektova dokumentace RD` is now highlighted in UI as:
     - `staging/workbench`
     - temporary intake product for project docs triage
+  - workbench triage now also supports:
+    - visible counts in staging product
+    - `Otevrit dalsi doporuceny`
+    - `Otevrit dalsi bez navrhu`
 
 ---
 

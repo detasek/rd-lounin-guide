@@ -719,6 +719,7 @@ async function loadDocuments() {
   const el = document.getElementById('documentsList');
   const summaryEl = document.getElementById('documentSummary');
   const suggestionsEl = document.getElementById('documentSuggestions');
+  const workbenchEl = document.getElementById('documentWorkbench');
   if (!el) return;
 
   const scopedToSelected = documentScope === 'selected' && selectedProductId;
@@ -735,7 +736,10 @@ async function loadDocuments() {
     return (duplicateMap.get(key) || 0) > 1;
   }).length;
   const unsortedCount = docsWithSuggestion.filter((doc) => !doc._suggestion).length;
+  const actionableSuggested = docsWithSuggestion.filter((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+  const actionableUnsorted = docsWithSuggestion.filter((doc) => !doc._suggestion);
   const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
+  const inWorkbench = scopedToSelected && isProjectDocsWorkbench(selectedProductName());
   const visibleDocs = docsWithSuggestion.filter((doc) => {
     if (documentFilter === 'all') return true;
     if (documentFilter === 'suggested') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
@@ -767,6 +771,23 @@ async function loadDocuments() {
               </div>
             </div>
           `).join('')}
+        </div>
+      `;
+    }
+  }
+
+  if (workbenchEl) {
+    if (!inWorkbench) {
+      workbenchEl.textContent = 'Workbench: vyber staging produkt pro trideni projektove dokumentace.';
+    } else {
+      workbenchEl.innerHTML = `
+        <div class="card">
+          <b>Workbench trideni</b>
+          <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporucene: ${actionableSuggested.length} | bez navrhu: ${actionableUnsorted.length}</div>
+          <div class="row-actions" style="margin-top:8px;">
+            <button type="button" class="ghost-btn" onclick="openNextSuggestedDocument()">Otevrit dalsi doporuceny</button>
+            <button type="button" class="ghost-btn" onclick="openNextUnsortedDocument()">Otevrit dalsi bez navrhu</button>
+          </div>
         </div>
       `;
     }
@@ -962,6 +983,46 @@ async function moveSuggestedDocumentsToProduct(productId, productName) {
 async function openSuggestedProduct(productId, productName) {
   await focusProductDocuments(productId, 'all');
   setDocumentStatus(`Otevren produkt ${productName}.`, 'ok');
+}
+
+async function openNextSuggestedDocument() {
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const candidate = docs
+    .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
+    .find((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+
+  if (!candidate) {
+    setDocumentStatus('Zadny dalsi doporuceny dokument.', 'ok');
+    return;
+  }
+
+  documentFilter = 'suggested';
+  openDocumentEditorId = candidate.id;
+  await loadDocuments();
+  scrollToSection('documentsList');
+  setDocumentStatus(`Otevren doporuceny dokument #${candidate.id}.`, 'ok');
+}
+
+async function openNextUnsortedDocument() {
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const candidate = docs
+    .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
+    .find((doc) => !doc._suggestion);
+
+  if (!candidate) {
+    setDocumentStatus('Zadny dalsi dokument bez navrhu.', 'ok');
+    return;
+  }
+
+  documentFilter = 'unsorted';
+  openDocumentEditorId = candidate.id;
+  await loadDocuments();
+  scrollToSection('documentsList');
+  setDocumentStatus(`Otevren dokument bez navrhu #${candidate.id}.`, 'ok');
 }
 
 function toggleDocumentEditor(id) {
