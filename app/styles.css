@@ -1,0 +1,21 @@
+
+#diaryForm {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    padding: 10px;
+}
+
+
+
+#photosGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.photo-item img {
+  width: 100%;
+  border-radius: 6px;
+}
+

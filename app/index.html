@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pruvodce stavbou RD Lounin</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      font: 14px/1.5 sans-serif;
+      background: #f6f7f9;
+      color: #1f2937;
+    }
+    h1, h2 {
+      margin: 0 0 12px;
+    }
+    section, form, .panel, .card {
+      background: #fff;
+      border: 1px solid #dbe2ea;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    input, textarea, select, button {
+      font: inherit;
+    }
+    input, textarea, select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      margin: 0 0 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      background: #0f766e;
+      color: #fff;
+      cursor: pointer;
+    }
+    .ghost-btn {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .ghost-btn.active {
+      background: #0f766e;
+      color: #fff;
+    }
+    .toolbar {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .filter-row, .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .muted {
+      color: #64748b;
+      font-size: 13px;
+    }
+    .status-ok {
+      color: #166534;
+    }
+    .status-miss {
+      color: #b91c1c;
+    }
+    .photo-item img,
+    .photo-item video {
+      max-width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pruvodce stavbou RD Lounin</h1>
+
+  <section>
+    <h2>API stav</h2>
+    <pre id="apiStatus">Nacitam...</pre>
+  </section>
+
+  <section>
+    <h2>Novy produkt</h2>
+    <form id="productForm">
+      <input id="name" placeholder="Nazev produktu" required>
+      <textarea id="description" placeholder="Popis"></textarea>
+      <button type="submit">Ulozit</button>
+    </form>
+    <div id="productTemplateStatus" class="muted">Rychly start produktu: pripraven.</div>
+    <div class="row-actions">
+      <button type="button" class="ghost-btn" onclick="createStarterProducts('top8')">Zalozit prvnich 8</button>
+      <button type="button" class="ghost-btn" onclick="createStarterProducts('all16')">Zalozit vsech 16</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Seznam produktu</h2>
+    <div id="productsList"></div>
+  </section>
+
+  <section>
+    <h2>Vybrany produkt</h2>
+    <div id="selectedProductSummary" class="muted">Vyber produkt.</div>
+    <div id="selectedProductGuide" class="muted">Zarazeni: -</div>
+    <div id="selectedProductHealth" class="muted">Stav produktu: -</div>
+    <div id="selectedProductIssues" class="muted">K reseni: -</div>
+    <div id="selectedProductNext" class="muted">Dalsi krok: -</div>
+    <div id="selectedProductCompletion" class="muted">Hotovost: -</div>
+    <div id="selectedProductChecklist" class="muted">Checklist: -</div>
+    <div class="row-actions">
+      <button type="button" class="ghost-btn" onclick="openProductDocuments()">Dokumenty</button>
+      <button type="button" class="ghost-btn" onclick="openProductReceipts()">Receipts</button>
+      <button type="button" class="ghost-btn" onclick="openProductMedia()">Media</button>
+      <button type="button" class="ghost-btn" onclick="openProductDiary()">Denik</button>
+    </div>
+    <div class="row-actions">
+      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('pending')">Receipt pending</button>
+      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('review')">OCR review</button>
+      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('missing_document_number')">Chybi doklad</button>
+      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('missing_supplier')">Chybi dodavatel</button>
+      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('missing_purchase_date')">Chybi datum</button>
+      <button type="button" class="ghost-btn" onclick="focusWatchFolder()">Inbox</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Dokumenty</h2>
+    <div id="documentSummary" class="muted">Documents: -</div>
+    <div id="documentStatus" class="muted">Pripraveno.</div>
+    <div class="row-actions">
+      <button type="button" class="ghost-btn" id="document-filter-all" onclick="setDocumentFilter('all')">Vse</button>
+      <button type="button" class="ghost-btn" id="document-filter-pdf" onclick="setDocumentFilter('pdf')">PDF</button>
+      <button type="button" class="ghost-btn" id="document-filter-image" onclick="setDocumentFilter('image')">Obrazky</button>
+      <button type="button" class="ghost-btn" id="document-filter-other" onclick="setDocumentFilter('other')">Ostatni</button>
+    </div>
+    <div id="documentsList"></div>
+    <form id="documentForm">
+      <input id="documentName" placeholder="nazev dokumentu pro single upload (volitelne)">
+      <label class="muted" for="documentFile">Vyber vice souboru</label>
+      <input id="documentFile" type="file" multiple>
+      <label class="muted" for="documentFolder">Nebo vyber slozku</label>
+      <input id="documentFolder" type="file" multiple webkitdirectory directory>
+      <button type="submit">Nahrat dokumenty</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Faktury / Uctenky</h2>
+    <div class="toolbar">
+      <div id="receiptSelectedProduct" class="muted">Produkt: vse</div>
+      <div class="filter-row">
+        <button type="button" class="ghost-btn" onclick="setReceiptFilter('all')">Vse</button>
+        <button type="button" class="ghost-btn" onclick="setReceiptFilter('green')">V zaruce</button>
+        <button type="button" class="ghost-btn" onclick="setReceiptFilter('orange')">Konci</button>
+        <button type="button" class="ghost-btn" onclick="setReceiptFilter('red')">Po zaruce</button>
+      </div>
+      <div id="receiptSummary" class="muted">Nacitam receipts...</div>
+      <div id="receiptStatus" class="muted" aria-live="polite"></div>
+    </div>
+    <div id="receiptsList"></div>
+    <form id="receiptForm">
+      <input id="receiptTitle" placeholder="nazev faktury / uctenky">
+      <input id="receiptFile" type="file" accept="application/pdf,image/*">
+      <button type="submit">Pridat fakturu / uctenku</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Zaruky</h2>
+    <h2>Upozorneni</h2>
+    <div id="warrantyAlerts"></div>
+    <div id="warrantyDashboard"></div>
+  </section>
+
+  <section>
+    <h2>Watcher minimum</h2>
+    <div id="watcherSummary" class="muted">Nacitam watcher...</div>
+    <div class="row-actions">
+      <button type="button" class="ghost-btn" onclick="openProductReceipts()">Receipts</button>
+      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('review')">OCR review</button>
+      <button type="button" class="ghost-btn" onclick="focusWatchFolder()">Inbox</button>
+    </div>
+    <div id="watcherList"></div>
+  </section>
+
+  <section>
+    <h2>Fotky</h2>
+    <form id="photoForm">
+      <input type="file" id="photoInput" accept="image/*,video/*">
+      <button type="submit">Nahrat foto / video</button>
+    </form>
+    <div id="photoStatus" class="muted" aria-live="polite"></div>
+    <div id="photoSummary" class="muted">Media summary: -</div>
+    <div class="row-actions">
+      <button type="button" class="ghost-btn" id="media-filter-all" onclick="setMediaFilter('all')">Vse</button>
+      <button type="button" class="ghost-btn" id="media-filter-image" onclick="setMediaFilter('image')">Obrazky</button>
+      <button type="button" class="ghost-btn" id="media-filter-video" onclick="setMediaFilter('video')">Videa</button>
+    </div>
+    <div class="card">
+      <b>Watch folder media</b>
+      <div class="muted" id="watchFolderHint">Sleduji /data/watch-folder/media</div>
+      <div class="row-actions">
+        <button type="button" class="ghost-btn" onclick="loadWatchFolderMedia()">Obnovit inbox</button>
+        <button type="button" class="ghost-btn" onclick="importAllWatchFolderMedia()">Import vse do produktu</button>
+      </div>
+      <div id="watchFolderMedia"></div>
+    </div>
+    <div id="photosGrid"></div>
+  </section>
+
+  <section>
+    <h2>Stavebni denik</h2>
+    <div class="toolbar">
+      <div class="muted">Rychly zapis k produktu nebo fazi.</div>
+      <div id="diaryStatus" class="muted" aria-live="polite"></div>
+    </div>
+    <div class="row-actions">
+      <button type="button" class="ghost-btn" id="diary-filter-all" onclick="setDiaryFilter('all')">Vse</button>
+      <button type="button" class="ghost-btn" id="diary-filter-product" onclick="setDiaryFilter('product')">Vybrany produkt</button>
+    </div>
+    <div id="diaryForm">
+      <label>Produkt</label><br>
+      <select id="diaryProduct"></select><br><br>
+      <label>Faze</label><br>
+      <select id="diaryPhase"></select><br><br>
+      <textarea id="diaryContent" placeholder="Co se dnes delalo..."></textarea><br>
+      <button type="button" onclick="addDiaryEntry()">Ulozit</button>
+    </div>
+    <div id="diaryList"></div>
+  </section>
+
+  <script src="config.js"></script>
+  <script src="app.js?v=10094"></script>
+
+  <div id="lightbox" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000c;justify-content:center;align-items:center;z-index:9999;">
+    <button id="lightboxClose" type="button" class="ghost-btn" style="position:absolute;top:16px;right:16px;z-index:10000;">Zavrit</button>
+    <img id="lightboxImg" style="display:none;max-width:95%;max-height:95%;">
+    <video id="lightboxVideo" controls style="display:none;max-width:95%;max-height:95%;border-radius:12px;background:#000;"></video>
+  </div>
+</body>
+</html>

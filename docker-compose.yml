@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  backend:
+    image: node:18
+    container_name: rd-lounin-api
+    working_dir: /app
+    command: sh -c "npm install && node app.js"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./api:/app
+      - ./data:/data
+    ports:
+      - "3010:3000"
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    container_name: rd-lounin-web
+    volumes:
+      - ./app:/usr/share/nginx/html
+    ports:
+      - "8091:80"
+    restart: unless-stopped
