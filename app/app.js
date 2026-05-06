@@ -786,9 +786,11 @@ async function loadDocuments() {
     } else {
       const triageDone = docs.length - actionableSuggested.length - actionableUnsorted.length;
       const triagePct = docs.length ? Math.round((triageDone / docs.length) * 100) : 100;
+      const workbenchDone = actionableSuggested.length === 0 && actionableUnsorted.length === 0;
       workbenchEl.innerHTML = `
         <div class="card">
           <b>Workbench trideni</b>
+          ${workbenchDone ? `<div class="muted" style="margin-top:6px;color:#0f766e;"><b>DONE: staging je dotrideny</b></div>` : ''}
           <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporucene: ${actionableSuggested.length} | bez navrhu: ${actionableUnsorted.length} | hotovo: ${triageDone}/${docs.length} (${triagePct}%)</div>
           <div class="muted" style="margin-top:6px;">Posledni rucni cil: ${lastManualDocumentProductId ? esc(productsMap[lastManualDocumentProductId] || `produkt #${lastManualDocumentProductId}`) : 'zadny'}</div>
           <div class="row-actions" style="margin-top:8px;">

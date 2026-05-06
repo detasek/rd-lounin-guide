@@ -606,6 +606,7 @@ Stage 2 – STRUKTURA
       - `Jen bez navrhu`
     - visible triage labels on cards
     - remembers last manual target product for repeated `Bez navrhu` assignment
+    - visible `DONE` state when staging no longer contains actionable documents
 
 ---
 
