@@ -1023,6 +1023,39 @@ async function moveAllSuggestedDocuments() {
   setDocumentStatus(`Presunuto doporucene: ${moved}.`, 'ok');
 }
 
+async function moveVisibleSuggestedDocuments() {
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const visibleDocs = getVisibleDocumentsForCurrentView(docs)
+    .filter((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+
+  if (!visibleDocs.length) {
+    setDocumentStatus('Zadne viditelne doporucene dokumenty k presunu.', 'ok');
+    return;
+  }
+
+  let moved = 0;
+
+  for (const doc of visibleDocs) {
+    const response = await fetch(`${API_BASE}/documents/${doc.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: doc.name,
+        product_id: doc._suggestion.productId
+      })
+    });
+    await parseJsonResponse(response, `PUT /documents/${doc.id}`);
+    moved += 1;
+  }
+
+  await loadDocuments();
+  await loadProducts();
+  await loadSelectedProductSummary();
+  setDocumentStatus(`Presunuto viditelne doporucene: ${moved}.`, 'ok');
+}
+
 async function copyVisibleDocumentsList() {
   const scopedToSelected = documentScope === 'selected' && selectedProductId;
   const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';

@@ -626,6 +626,7 @@ Stage 2 – STRUKTURA
       - top target move buckets
       - unsorted count
     - batch move of currently visible documents into one selected product
+    - batch move of currently visible suggested documents to their suggested targets
 
 ---
 
