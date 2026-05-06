@@ -17,6 +17,7 @@ let openDocumentEditorId = null;
 let lastWatchFolderCounts = { total: 0, image: 0, video: 0, file: 0 };
 let lastManualDocumentProductId = null;
 const PROJECT_DOCS_WORKBENCH = 'projektova dokumentace rd';
+const TRIAGE_PREFS_KEY = 'rd-lounin-triage-prefs-v1';
 
 const STARTER_PRODUCTS_TOP8 = [
   { name: 'Zakladova deska', description: 'Konstrukcni celek: skladba, vykresy, kalkulace, fotky armovani a betonaze.' },
@@ -188,6 +189,39 @@ function normalizeText(value) {
 
 function isProjectDocsWorkbench(name) {
   return normalizeText(name) === PROJECT_DOCS_WORKBENCH;
+}
+
+function saveTriagePrefs() {
+  try {
+    window.localStorage.setItem(TRIAGE_PREFS_KEY, JSON.stringify({
+      selectedProductId,
+      documentFilter,
+      documentScope,
+      documentSearch,
+      documentSort,
+      lastManualDocumentProductId
+    }));
+  } catch (_) {}
+}
+
+function restoreTriagePrefs() {
+  try {
+    const raw = window.localStorage.getItem(TRIAGE_PREFS_KEY);
+    if (!raw) return;
+    const prefs = JSON.parse(raw);
+    if (prefs && typeof prefs === 'object') {
+      if (prefs.selectedProductId !== undefined && prefs.selectedProductId !== null && prefs.selectedProductId !== '') {
+        selectedProductId = Number(prefs.selectedProductId);
+      }
+      if (typeof prefs.documentFilter === 'string') documentFilter = prefs.documentFilter;
+      if (typeof prefs.documentScope === 'string') documentScope = prefs.documentScope;
+      if (typeof prefs.documentSearch === 'string') documentSearch = prefs.documentSearch;
+      if (typeof prefs.documentSort === 'string') documentSort = prefs.documentSort;
+      if (prefs.lastManualDocumentProductId !== undefined && prefs.lastManualDocumentProductId !== null && prefs.lastManualDocumentProductId !== '') {
+        lastManualDocumentProductId = Number(prefs.lastManualDocumentProductId);
+      }
+    }
+  } catch (_) {}
 }
 
 function scrollToSection(id) {
@@ -458,6 +492,10 @@ async function loadProducts() {
     return;
   }
 
+  if (selectedProductId && !products.some((product) => Number(product.id) === Number(selectedProductId))) {
+    selectedProductId = null;
+  }
+
   products.forEach((product) => {
     productsMap[product.id] = product.name;
     if (!selectedProductId) selectedProductId = product.id;
@@ -480,6 +518,7 @@ async function loadProducts() {
   });
 
   updateReceiptToolbar([]);
+  saveTriagePrefs();
   loadSelectedProductSummary();
 }
 
@@ -497,6 +536,7 @@ async function deleteProduct(id) {
 
 function selectProduct(id) {
   selectedProductId = id;
+  saveTriagePrefs();
   updateReceiptToolbar([]);
   loadDocuments();
   loadPhotos();
@@ -586,18 +626,21 @@ function buildDocumentDuplicateMap(docs) {
 
 function setDocumentFilter(filter) {
   documentFilter = filter;
+  saveTriagePrefs();
   updateDocumentFilterButtons();
   loadDocuments();
 }
 
 function setDocumentScope(scope) {
   documentScope = scope;
+  saveTriagePrefs();
   updateDocumentScopeButtons();
   loadDocuments();
 }
 
 function setDocumentSearch(value) {
   documentSearch = String(value || '').trim().toLowerCase();
+  saveTriagePrefs();
   loadDocuments();
 }
 
@@ -605,11 +648,13 @@ function clearDocumentSearch() {
   documentSearch = '';
   const input = document.getElementById('documentSearch');
   if (input) input.value = '';
+  saveTriagePrefs();
   loadDocuments();
 }
 
 function setDocumentSort(value) {
   documentSort = value || 'newest';
+  saveTriagePrefs();
   loadDocuments();
 }
 
@@ -659,6 +704,7 @@ function updateDocumentUnsortedTargetOptions() {
   } else if (selectedProductId && Array.from(select.options).some((option) => Number(option.value) === Number(selectedProductId))) {
     select.value = String(selectedProductId);
   }
+  saveTriagePrefs();
 }
 
 function updateDocumentVisibleTargetOptions() {
@@ -674,6 +720,7 @@ function updateDocumentVisibleTargetOptions() {
   } else if (selectedProductId && Array.from(select.options).some((option) => Number(option.value) === Number(selectedProductId))) {
     select.value = String(selectedProductId);
   }
+  saveTriagePrefs();
 }
 
 function setDocumentStatus(message, kind = '') {
@@ -1104,6 +1151,7 @@ async function moveAllUnsortedDocuments() {
   }
 
   lastManualDocumentProductId = Number(targetProductId);
+  saveTriagePrefs();
   let moved = 0;
 
   for (const item of candidates) {
@@ -1434,6 +1482,7 @@ async function moveDocumentToQuickProduct(id) {
 
   try {
     lastManualDocumentProductId = Number(productInput.value);
+    saveTriagePrefs();
     const response = await fetch(`${API_BASE}/documents/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -2370,10 +2419,16 @@ async function addDiaryEntry() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  restoreTriagePrefs();
   document.getElementById('productForm').addEventListener('submit', createProduct);
   document.getElementById('documentForm').addEventListener('submit', uploadDocument);
   document.getElementById('photoForm').addEventListener('submit', uploadPhoto);
   document.getElementById('receiptForm').addEventListener('submit', uploadReceipt);
+
+  const documentSearchInput = document.getElementById('documentSearch');
+  if (documentSearchInput) documentSearchInput.value = documentSearch;
+  const documentSortSelect = document.getElementById('documentSort');
+  if (documentSortSelect) documentSortSelect.value = documentSort;
 
   await bootStatus();
   await loadProducts();

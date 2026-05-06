@@ -628,6 +628,13 @@ Stage 2 – STRUKTURA
     - batch move of currently visible documents into one selected product
     - batch move of currently visible suggested documents to their suggested targets
     - triage filter `K reseni` = suggested + unsorted
+    - triage preferences persist in browser:
+      - selected product
+      - filter
+      - scope
+      - search
+      - sort
+      - last manual target
 
 ---
 
