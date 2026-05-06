@@ -598,6 +598,8 @@ Stage 2 – STRUKTURA
     - visible counts in staging product
     - `Otevrit dalsi doporuceny`
     - `Otevrit dalsi bez navrhu`
+    - auto-continue to next triage item after move
+    - visible progress `hotovo X/Y (%)`
 
 ---
 

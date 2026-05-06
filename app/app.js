@@ -780,10 +780,12 @@ async function loadDocuments() {
     if (!inWorkbench) {
       workbenchEl.textContent = 'Workbench: vyber staging produkt pro trideni projektove dokumentace.';
     } else {
+      const triageDone = docs.length - actionableSuggested.length - actionableUnsorted.length;
+      const triagePct = docs.length ? Math.round((triageDone / docs.length) * 100) : 100;
       workbenchEl.innerHTML = `
         <div class="card">
           <b>Workbench trideni</b>
-          <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporucene: ${actionableSuggested.length} | bez navrhu: ${actionableUnsorted.length}</div>
+          <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporucene: ${actionableSuggested.length} | bez navrhu: ${actionableUnsorted.length} | hotovo: ${triageDone}/${docs.length} (${triagePct}%)</div>
           <div class="row-actions" style="margin-top:8px;">
             <button type="button" class="ghost-btn" onclick="openNextSuggestedDocument()">Otevrit dalsi doporuceny</button>
             <button type="button" class="ghost-btn" onclick="openNextUnsortedDocument()">Otevrit dalsi bez navrhu</button>
@@ -1025,6 +1027,46 @@ async function openNextUnsortedDocument() {
   setDocumentStatus(`Otevren dokument bez navrhu #${candidate.id}.`, 'ok');
 }
 
+async function continueWorkbenchQueue(prefer = null) {
+  const inWorkbench = documentScope === 'selected' && selectedProductId && isProjectDocsWorkbench(selectedProductName());
+  if (!inWorkbench) return;
+
+  if (prefer === 'suggested') {
+    await openNextSuggestedDocument();
+    return;
+  }
+
+  if (prefer === 'unsorted') {
+    await openNextUnsortedDocument();
+    return;
+  }
+
+  const path = `/documents?product_id=${selectedProductId}`;
+  const docs = await apiGet(path);
+  const docsWithSuggestion = docs.map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }));
+  const nextSuggested = docsWithSuggestion.find((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+  if (nextSuggested) {
+    documentFilter = 'suggested';
+    openDocumentEditorId = nextSuggested.id;
+    await loadDocuments();
+    scrollToSection('documentsList');
+    setDocumentStatus(`Pokracuj: doporuceny dokument #${nextSuggested.id}.`, 'ok');
+    return;
+  }
+
+  const nextUnsorted = docsWithSuggestion.find((doc) => !doc._suggestion);
+  if (nextUnsorted) {
+    documentFilter = 'unsorted';
+    openDocumentEditorId = nextUnsorted.id;
+    await loadDocuments();
+    scrollToSection('documentsList');
+    setDocumentStatus(`Pokracuj: dokument bez navrhu #${nextUnsorted.id}.`, 'ok');
+    return;
+  }
+
+  setDocumentStatus('Workbench je dotrideny.', 'ok');
+}
+
 function toggleDocumentEditor(id) {
   openDocumentEditorId = openDocumentEditorId === id ? null : id;
   loadDocuments();
@@ -1079,6 +1121,7 @@ async function moveDocumentToSelectedProduct(id) {
     await loadProducts();
     await loadSelectedProductSummary();
     setDocumentStatus(`Dokument #${id} presunut na produkt ${selectedProductName()}.`, 'ok');
+    await continueWorkbenchQueue();
   } catch (e) {
     setDocumentStatus(`MISS: ${e.message}`, 'miss');
     alert(`MISS: ${e.message}`);
@@ -1103,6 +1146,7 @@ async function moveDocumentToSuggestedProduct(id, productId, productName) {
     await loadProducts();
     await loadSelectedProductSummary();
     setDocumentStatus(`Dokument #${id} presunut do ${productName}.`, 'ok');
+    await continueWorkbenchQueue('suggested');
   } catch (e) {
     setDocumentStatus(`MISS: ${e.message}`, 'miss');
     alert(`MISS: ${e.message}`);
@@ -1131,6 +1175,7 @@ async function moveDocumentToQuickProduct(id) {
     await loadProducts();
     await loadSelectedProductSummary();
     setDocumentStatus(`Dokument #${id} zarazen do ${(result?.document && productsMap[result.document.product_id]) || 'vybraneho produktu'}.`, 'ok');
+    await continueWorkbenchQueue('unsorted');
   } catch (e) {
     setDocumentStatus(`MISS: ${e.message}`, 'miss');
     alert(`MISS: ${e.message}`);
