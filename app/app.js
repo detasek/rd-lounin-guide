@@ -575,7 +575,7 @@ async function focusProductDocuments(productId, filter = 'all') {
 }
 
 function updateDocumentFilterButtons() {
-  const ids = ['all', 'pdf', 'image', 'other', 'suggested'];
+  const ids = ['all', 'pdf', 'image', 'other', 'suggested', 'unsorted'];
   ids.forEach((id) => {
     const btn = document.getElementById(`document-filter-${id}`);
     if (!btn) return;
@@ -687,10 +687,12 @@ async function loadDocuments() {
     const key = `${doc.file_path || ''}::${doc.original_name || doc.name || ''}`;
     return (duplicateMap.get(key) || 0) > 1;
   }).length;
+  const unsortedCount = docsWithSuggestion.filter((doc) => !doc._suggestion).length;
   const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
   const visibleDocs = docsWithSuggestion.filter((doc) => {
     if (documentFilter === 'all') return true;
     if (documentFilter === 'suggested') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+    if (documentFilter === 'unsorted') return !doc._suggestion;
     return getDocumentKind(doc) === documentFilter;
   });
 
@@ -698,16 +700,17 @@ async function loadDocuments() {
 
   if (summaryEl) {
     summaryEl.textContent =
-      `Documents: ${docs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | scope: ${documentScope} | filtr: ${documentFilter}`;
+      `Documents: ${docs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | scope: ${documentScope} | filtr: ${documentFilter}`;
   }
 
   if (suggestionsEl) {
     if (!suggestionBuckets.length) {
-      suggestionsEl.textContent = 'Navrhy trideni: zadne.';
+      suggestionsEl.textContent = unsortedCount ? `Navrhy trideni: zadne. Bez navrhu: ${unsortedCount}.` : 'Navrhy trideni: zadne.';
     } else {
       suggestionsEl.innerHTML = `
         <div class="card">
           <b>Navrhy trideni</b>
+          <div class="muted" style="margin-top:6px;">Bez navrhu: ${unsortedCount}</div>
           ${suggestionBuckets.map((bucket) => `
             <div style="margin-top:8px;">
               <div>${esc(bucket.productName)}: ${bucket.count}</div>
@@ -728,6 +731,7 @@ async function loadDocuments() {
       documentFilter === 'image' ? 'Zadne obrazkove dokumenty.' :
       documentFilter === 'other' ? 'Zadne ostatni dokumenty.' :
       documentFilter === 'suggested' ? 'Zadne doporucene presuny.' :
+      documentFilter === 'unsorted' ? 'Zadne dokumenty bez navrhu.' :
       'Zadne dokumenty.';
     el.innerHTML = `<div class="muted">${label}</div>`;
     updateDocumentFilterButtons();
@@ -755,6 +759,7 @@ async function loadDocuments() {
         ${isDuplicate ? `<div class="muted" style="color:#b45309;">Mozna duplicita</div>` : ''}
         <div class="muted">Aktualne: ${esc(currentProductName)}</div>
         ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<div class="muted" style="color:#0f766e;">Doporuceno presunout do: ${esc(suggestion.productName)}</div>` : ''}
+        ${!suggestion ? `<div class="muted" style="color:#b45309;">Doporuceni: zadne</div>` : ''}
         <div class="muted">${esc(doc.mime_type || '-')} | Vytvoreno: ${esc(createdAt)}</div>
         <div class="muted">Cesta: ${esc(absolutePath)}</div>
         <div class="row-actions">

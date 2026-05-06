@@ -585,6 +585,10 @@ Stage 2 – STRUKTURA
   - suggested target actions now also support:
     - open suggested product from document card
     - open target product from grouped suggestion summary
+  - document triage now also supports:
+    - `Bez navrhu` filter
+    - unsorted count in document summary
+    - visible `Doporuceni: zadne` hint on cards without matched target
 
 ---
 
