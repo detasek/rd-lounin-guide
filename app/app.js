@@ -762,6 +762,14 @@ async function loadDocuments() {
         ${!suggestion ? `<div class="muted" style="color:#b45309;">Doporuceni: zadne</div>` : ''}
         <div class="muted">${esc(doc.mime_type || '-')} | Vytvoreno: ${esc(createdAt)}</div>
         <div class="muted">Cesta: ${esc(absolutePath)}</div>
+        ${!suggestion ? `
+        <div class="row-actions" style="margin-top:8px;">
+          <select id="document-quick-product-${doc.id}">
+            ${buildProductOptions(doc.product_id)}
+          </select>
+          <button class="ghost-btn" onclick="moveDocumentToQuickProduct(${doc.id})">Rychle zaradit</button>
+        </div>
+        ` : ''}
         <div class="row-actions">
           ${isPdf ? `<button class="ghost-btn" onclick="togglePreview(${doc.id})">Nahled</button>` : ''}
           <button class="ghost-btn" onclick="toggleDocumentEditor(${doc.id})">Upravit nazev</button>
@@ -943,6 +951,34 @@ async function moveDocumentToSuggestedProduct(id, productId, productName) {
     await loadProducts();
     await loadSelectedProductSummary();
     setDocumentStatus(`Dokument #${id} presunut do ${productName}.`, 'ok');
+  } catch (e) {
+    setDocumentStatus(`MISS: ${e.message}`, 'miss');
+    alert(`MISS: ${e.message}`);
+  }
+}
+
+async function moveDocumentToQuickProduct(id) {
+  const productInput = document.getElementById(`document-quick-product-${id}`);
+  const nameInput = document.getElementById(`document-name-${id}`);
+  if (!productInput?.value) {
+    setDocumentStatus('MISS: vyber cilovy produkt', 'miss');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/documents/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: nameInput ? nameInput.value : undefined,
+        product_id: productInput.value
+      })
+    });
+    const result = await parseJsonResponse(response, `PUT /documents/${id}`);
+    await loadDocuments();
+    await loadProducts();
+    await loadSelectedProductSummary();
+    setDocumentStatus(`Dokument #${id} zarazen do ${(result?.document && productsMap[result.document.product_id]) || 'vybraneho produktu'}.`, 'ok');
   } catch (e) {
     setDocumentStatus(`MISS: ${e.message}`, 'miss');
     alert(`MISS: ${e.message}`);

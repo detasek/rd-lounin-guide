@@ -589,6 +589,7 @@ Stage 2 – STRUKTURA
     - `Bez navrhu` filter
     - unsorted count in document summary
     - visible `Doporuceni: zadne` hint on cards without matched target
+    - quick manual assignment directly on unsorted document cards
 
 ---
 
