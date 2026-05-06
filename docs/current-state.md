@@ -600,6 +600,11 @@ Stage 2 – STRUKTURA
     - `Otevrit dalsi bez navrhu`
     - auto-continue to next triage item after move
     - visible progress `hotovo X/Y (%)`
+    - quick workbench views:
+      - `Vse ve stagingu`
+      - `Jen doporucene`
+      - `Jen bez navrhu`
+    - visible triage labels on cards
 
 ---
 

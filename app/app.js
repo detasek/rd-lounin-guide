@@ -787,6 +787,11 @@ async function loadDocuments() {
           <b>Workbench trideni</b>
           <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporucene: ${actionableSuggested.length} | bez navrhu: ${actionableUnsorted.length} | hotovo: ${triageDone}/${docs.length} (${triagePct}%)</div>
           <div class="row-actions" style="margin-top:8px;">
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('all')">Vse ve stagingu</button>
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('suggested')">Jen doporucene</button>
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('unsorted')">Jen bez navrhu</button>
+          </div>
+          <div class="row-actions" style="margin-top:8px;">
             <button type="button" class="ghost-btn" onclick="openNextSuggestedDocument()">Otevrit dalsi doporuceny</button>
             <button type="button" class="ghost-btn" onclick="openNextUnsortedDocument()">Otevrit dalsi bez navrhu</button>
           </div>
@@ -826,6 +831,8 @@ async function loadDocuments() {
       <div class="card">
         <img src="${qrUrl(doc.id)}" style="float:right;width:40px;height:40px;">
         <a href="#" onclick="openMediaViewer('${url}', '${esc(doc.mime_type || '')}');return false;"><b>${docIcon(doc)} ${esc(docName)}</b></a>
+        ${inWorkbench && suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<div class="muted" style="color:#0f766e;"><b>TRIAGE: doporuceny presun</b></div>` : ''}
+        ${inWorkbench && !suggestion ? `<div class="muted" style="color:#b45309;"><b>TRIAGE: rucni zarazeni</b></div>` : ''}
         ${isDuplicate ? `<div class="muted" style="color:#b45309;">Mozna duplicita</div>` : ''}
         <div class="muted">Aktualne: ${esc(currentProductName)}</div>
         ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<div class="muted" style="color:#0f766e;">Doporuceno presunout do: ${esc(suggestion.productName)}</div>` : ''}
