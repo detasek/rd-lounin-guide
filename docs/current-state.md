@@ -610,6 +610,10 @@ Stage 2 – STRUKTURA
     - fast actions:
       - `Presunout dalsi doporuceny`
       - `Zaradit dalsi bez navrhu do posledniho cile`
+    - fulltext search in documents by:
+      - current name
+      - original name
+      - file path
 
 ---
 

@@ -7,6 +7,7 @@ let receiptFilter = 'all';
 let mediaFilter = 'all';
 let documentFilter = 'all';
 let documentScope = 'selected';
+let documentSearch = '';
 let diaryFilter = 'all';
 let focusedReceiptId = null;
 let openReceiptEditorId = null;
@@ -594,6 +595,18 @@ function setDocumentScope(scope) {
   loadDocuments();
 }
 
+function setDocumentSearch(value) {
+  documentSearch = String(value || '').trim().toLowerCase();
+  loadDocuments();
+}
+
+function clearDocumentSearch() {
+  documentSearch = '';
+  const input = document.getElementById('documentSearch');
+  if (input) input.value = '';
+  loadDocuments();
+}
+
 async function focusProductDocuments(productId, filter = 'all') {
   selectedProductId = Number(productId);
   documentScope = 'selected';
@@ -745,6 +758,14 @@ async function loadDocuments() {
   const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
   const inWorkbench = scopedToSelected && isProjectDocsWorkbench(selectedProductName());
   const visibleDocs = docsWithSuggestion.filter((doc) => {
+    if (documentSearch) {
+      const haystack = [
+        doc.name,
+        doc.original_name,
+        doc.file_path
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(documentSearch)) return false;
+    }
     if (documentFilter === 'all') return true;
     if (documentFilter === 'suggested') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
     if (documentFilter === 'unsorted') return !doc._suggestion;
@@ -755,7 +776,7 @@ async function loadDocuments() {
 
   if (summaryEl) {
     summaryEl.textContent =
-      `Documents: ${docs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | scope: ${documentScope} | filtr: ${documentFilter}`;
+      `Documents: ${docs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | scope: ${documentScope} | filtr: ${documentFilter} | hledani: ${documentSearch || '-'}`;
   }
 
   if (suggestionsEl) {
@@ -818,6 +839,7 @@ async function loadDocuments() {
       documentFilter === 'other' ? 'Zadne ostatni dokumenty.' :
       documentFilter === 'suggested' ? 'Zadne doporucene presuny.' :
       documentFilter === 'unsorted' ? 'Zadne dokumenty bez navrhu.' :
+      documentSearch ? 'Hledani nic nenaslo.' :
       'Zadne dokumenty.';
     el.innerHTML = `<div class="muted">${label}</div>`;
     updateDocumentFilterButtons();
