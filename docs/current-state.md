@@ -590,6 +590,7 @@ Stage 2 – STRUKTURA
     - unsorted count in document summary
     - visible `Doporuceni: zadne` hint on cards without matched target
     - quick manual assignment directly on unsorted document cards
+    - batch manual assignment of all `Bez navrhu` documents into one selected product
 
 ---
 

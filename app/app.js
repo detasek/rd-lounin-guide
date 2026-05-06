@@ -591,6 +591,18 @@ function updateDocumentScopeButtons() {
   });
 }
 
+function updateDocumentUnsortedTargetOptions() {
+  const select = document.getElementById('document-unsorted-target');
+  if (!select) return;
+  const currentValue = select.value;
+  select.innerHTML = buildProductOptions(currentValue || selectedProductId || '');
+  if (currentValue && Array.from(select.options).some((option) => option.value === currentValue)) {
+    select.value = currentValue;
+  } else if (selectedProductId && Array.from(select.options).some((option) => Number(option.value) === Number(selectedProductId))) {
+    select.value = String(selectedProductId);
+  }
+}
+
 function setDocumentStatus(message, kind = '') {
   const el = document.getElementById('documentStatus');
   if (!el) return;
@@ -798,6 +810,7 @@ async function loadDocuments() {
   openDocumentEditorId = null;
   updateDocumentFilterButtons();
   updateDocumentScopeButtons();
+  updateDocumentUnsortedTargetOptions();
 }
 
 async function moveAllSuggestedDocuments() {
@@ -832,6 +845,49 @@ async function moveAllSuggestedDocuments() {
   await loadProducts();
   await loadSelectedProductSummary();
   setDocumentStatus(`Presunuto doporucene: ${moved}.`, 'ok');
+}
+
+async function moveAllUnsortedDocuments() {
+  const select = document.getElementById('document-unsorted-target');
+  const targetProductId = select?.value;
+
+  if (!targetProductId) {
+    setDocumentStatus('MISS: vyber cilovy produkt pro bez navrhu', 'miss');
+    return;
+  }
+
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const candidates = docs
+    .map((doc) => ({ doc, suggestion: suggestDocumentTarget(doc) }))
+    .filter((item) => !item.suggestion && Number(item.doc.product_id) !== Number(targetProductId));
+
+  if (!candidates.length) {
+    setDocumentStatus('Zadne dokumenty bez navrhu k zarazeni.', 'ok');
+    return;
+  }
+
+  let moved = 0;
+
+  for (const item of candidates) {
+    const response = await fetch(`${API_BASE}/documents/${item.doc.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: item.doc.name,
+        product_id: targetProductId
+      })
+    });
+    await parseJsonResponse(response, `PUT /documents/${item.doc.id}`);
+    moved += 1;
+  }
+
+  await loadDocuments();
+  await loadProducts();
+  await loadSelectedProductSummary();
+  const targetName = productsMap[targetProductId] || 'vybraneho produktu';
+  setDocumentStatus(`Zarazeno bez navrhu do ${targetName}: ${moved}.`, 'ok');
 }
 
 async function moveSuggestedDocumentsToProduct(productId, productName) {
