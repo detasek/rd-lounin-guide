@@ -13,6 +13,7 @@ let openReceiptEditorId = null;
 let openMediaEditorId = null;
 let openDocumentEditorId = null;
 let lastWatchFolderCounts = { total: 0, image: 0, video: 0, file: 0 };
+const PROJECT_DOCS_WORKBENCH = 'projektova dokumentace rd';
 
 const STARTER_PRODUCTS_TOP8 = [
   { name: 'Zakladova deska', description: 'Konstrukcni celek: skladba, vykresy, kalkulace, fotky armovani a betonaze.' },
@@ -174,6 +175,18 @@ function selectedProductName() {
   return productsMap[selectedProductId] || `produkt #${selectedProductId}`;
 }
 
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function isProjectDocsWorkbench(name) {
+  return normalizeText(name) === PROJECT_DOCS_WORKBENCH;
+}
+
 function scrollToSection(id) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -241,7 +254,9 @@ async function loadSelectedProductSummary() {
     const diaryForProduct = (diary || []).filter((entry) => Number(entry.product_id) === Number(selectedProductId));
     const photoList = photos || [];
     const receiptList = receipts || [];
-    const guide = getProductGuide(selectedProductName());
+    const currentProductName = selectedProductName();
+    const guide = getProductGuide(currentProductName);
+    const isWorkbench = isProjectDocsWorkbench(currentProductName);
     const pdfDocuments = documentList.filter((item) => getDocumentKind(item) === 'pdf').length;
     const imageDocuments = documentList.filter((item) => getDocumentKind(item) === 'image').length;
     const otherDocuments = documentList.filter((item) => getDocumentKind(item) === 'other').length;
@@ -287,7 +302,8 @@ async function loadSelectedProductSummary() {
     const completionPct = Math.round((doneChecklist / checklist.length) * 100);
 
     let nextStep = 'Bez akutni akce.';
-    if (inboxCount > 0) nextStep = `Zpracuj inbox media (${inboxCount}).`;
+    if (isWorkbench) nextStep = 'Tridit dokumentaci do cilovych produktu.';
+    else if (inboxCount > 0) nextStep = `Zpracuj inbox media (${inboxCount}).`;
     else if (reviewNeeded > 0) nextStep = `Zkontroluj OCR receipts (${reviewNeeded}).`;
     else if (missingDocumentNumber > 0) nextStep = `Dopln cislo dokladu u receipts (${missingDocumentNumber}).`;
     else if (missingSupplier > 0) nextStep = `Dopln dodavatele u receipts (${missingSupplier}).`;
@@ -299,16 +315,20 @@ async function loadSelectedProductSummary() {
     else if (!diaryForProduct.length) nextStep = 'Pridat prvni zapis do deniku.';
 
     el.textContent =
-      `Produkt: ${selectedProductName()} | dokumenty: ${documentList.length} (pdf ${pdfDocuments}, obrazky ${imageDocuments}, ostatni ${otherDocuments}) | receipts: ${receiptList.length} (ready ${readyReceipts}, pending ${pendingReceipts}) | media: ${photoList.length} (obrazky ${imageCount}, videa ${videoCount}) | diary: ${diaryForProduct.length} | diary filtr: ${diaryFilter}`;
+      `Produkt: ${currentProductName}${isWorkbench ? ' | staging/workbench' : ''} | dokumenty: ${documentList.length} (pdf ${pdfDocuments}, obrazky ${imageDocuments}, ostatni ${otherDocuments}) | receipts: ${receiptList.length} (ready ${readyReceipts}, pending ${pendingReceipts}) | media: ${photoList.length} (obrazky ${imageCount}, videa ${videoCount}) | diary: ${diaryForProduct.length} | diary filtr: ${diaryFilter}`;
 
     if (guideEl) {
-      guideEl.textContent = guide
+      guideEl.textContent = isWorkbench
+        ? 'Zarazeni: staging/workbench | nahrat: projektova dokumentace, rozpocty, vykresy, technicke podklady'
+        : guide
         ? `Zarazeni: #${guide.order} | skupina: ${guide.group} | nahrat: ${guide.uploads}`
         : 'Zarazeni: vlastni produkt bez sablony';
     }
 
     if (healthEl) {
-      healthEl.textContent = `Stav produktu: ${productHealth} | problemu: ${criticalIssues}`;
+      healthEl.textContent = isWorkbench
+        ? `Stav produktu: staging | problemu: ${criticalIssues}`
+        : `Stav produktu: ${productHealth} | problemu: ${criticalIssues}`;
     }
 
     if (issuesEl) {
@@ -321,18 +341,31 @@ async function loadSelectedProductSummary() {
         `zaruka do 30 dni ${expiringSoon}`,
         `inbox ${inboxCount}`
       ];
-      issuesEl.textContent = `K reseni: ${parts.join(' | ')}`;
+      const suggestedDocumentCount = documentList.filter((item) => {
+        const suggestion = suggestDocumentTarget(item);
+        return suggestion && Number(suggestion.productId) !== Number(item.product_id);
+      }).length;
+      const unsortedDocumentCount = documentList.filter((item) => !suggestDocumentTarget(item)).length;
+      issuesEl.textContent = isWorkbench
+        ? `K reseni: trideni dokumentace | doporucene ${suggestedDocumentCount} | bez navrhu ${unsortedDocumentCount} | inbox ${inboxCount}`
+        : `K reseni: ${parts.join(' | ')}`;
     }
 
     if (nextEl) {
       nextEl.textContent = `Dalsi krok: ${nextStep}`;
     }
     if (completionEl) {
-      completionEl.textContent = `Hotovost: ${completionPct}% | splneno ${doneChecklist}/${checklist.length}`;
+      completionEl.textContent = isWorkbench
+        ? `Hotovost: staging | dokumenty ${documentList.length} | doporucene ${documentList.filter((item) => {
+            const suggestion = suggestDocumentTarget(item);
+            return suggestion && Number(suggestion.productId) !== Number(item.product_id);
+          }).length}`
+        : `Hotovost: ${completionPct}% | splneno ${doneChecklist}/${checklist.length}`;
     }
     if (checklistEl) {
-      checklistEl.textContent =
-        `Checklist: ${checklist.map((item) => `${item.ok ? 'OK' : 'MISS'} ${item.label}`).join(' | ')}`;
+      checklistEl.textContent = isWorkbench
+        ? `Checklist: ${documentList.length ? 'OK' : 'MISS'} dokumentace nahrana | ${documentList.some((item) => !!suggestDocumentTarget(item)) ? 'OK' : 'MISS'} navrhy trideni | ${documentList.some((item) => !suggestDocumentTarget(item)) ? 'OK' : 'MISS'} zbyva rucni triage`
+        : `Checklist: ${checklist.map((item) => `${item.ok ? 'OK' : 'MISS'} ${item.label}`).join(' | ')}`;
     }
   } catch (e) {
     el.textContent = `MISS: ${e.message}`;
@@ -426,12 +459,14 @@ async function loadProducts() {
     productsMap[product.id] = product.name;
     if (!selectedProductId) selectedProductId = product.id;
     const guide = getProductGuide(product.name);
+    const isWorkbench = isProjectDocsWorkbench(product.name);
 
     el.innerHTML += `
       <div class="card">
         <img src="${qrUrl(product.id)}" style="float:right;width:40px;height:40px;">
-        <b>${esc(product.name)}</b> (${product.id})${guide ? ` <span class="muted">#${guide.order} | ${esc(guide.group)}</span>` : ''}<br>
+        <b>${esc(product.name)}</b> (${product.id})${guide ? ` <span class="muted">#${guide.order} | ${esc(guide.group)}</span>` : ''}${isWorkbench ? ` <span class="muted" style="color:#0f766e;">staging/workbench</span>` : ''}<br>
         ${esc(product.description || '')}<br>
+        ${isWorkbench ? `<div class="muted">Workbench: sem nahraj projektovou dokumentaci a odtud ji trid.</div>` : ''}
         ${guide ? `<div class="muted">Nahrat: ${esc(guide.uploads)}</div>` : ''}
         <div class="row-actions">
           <button onclick="selectProduct(${product.id})">Vybrat</button>

@@ -591,6 +591,9 @@ Stage 2 – STRUKTURA
     - visible `Doporuceni: zadne` hint on cards without matched target
     - quick manual assignment directly on unsorted document cards
     - batch manual assignment of all `Bez navrhu` documents into one selected product
+  - `Projektova dokumentace RD` is now highlighted in UI as:
+    - `staging/workbench`
+    - temporary intake product for project docs triage
 
 ---
 
