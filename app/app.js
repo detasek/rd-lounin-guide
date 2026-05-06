@@ -802,6 +802,10 @@ async function loadDocuments() {
             <button type="button" class="ghost-btn" onclick="openNextSuggestedDocument()">Otevrit dalsi doporuceny</button>
             <button type="button" class="ghost-btn" onclick="openNextUnsortedDocument()">Otevrit dalsi bez navrhu</button>
           </div>
+          <div class="row-actions" style="margin-top:8px;">
+            <button type="button" class="ghost-btn" onclick="moveNextSuggestedDocument()">Presunout dalsi doporuceny</button>
+            <button type="button" class="ghost-btn" onclick="moveNextUnsortedDocumentToLastTarget()">Zaradit dalsi bez navrhu do posledniho cile</button>
+          </div>
         </div>
       `;
     }
@@ -1040,6 +1044,56 @@ async function openNextUnsortedDocument() {
   await loadDocuments();
   scrollToSection('documentsList');
   setDocumentStatus(`Otevren dokument bez navrhu #${candidate.id}.`, 'ok');
+}
+
+async function moveNextSuggestedDocument() {
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const candidate = docs
+    .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
+    .find((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+
+  if (!candidate) {
+    setDocumentStatus('Zadny dalsi doporuceny dokument k presunu.', 'ok');
+    return;
+  }
+
+  await moveDocumentToSuggestedProduct(candidate.id, candidate._suggestion.productId, candidate._suggestion.productName);
+}
+
+async function moveNextUnsortedDocumentToLastTarget() {
+  if (!lastManualDocumentProductId) {
+    setDocumentStatus('MISS: zatim neni posledni rucni cil', 'miss');
+    return;
+  }
+
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const candidate = docs
+    .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
+    .find((doc) => !doc._suggestion);
+
+  if (!candidate) {
+    setDocumentStatus('Zadny dalsi dokument bez navrhu k zarazeni.', 'ok');
+    return;
+  }
+
+  const response = await fetch(`${API_BASE}/documents/${candidate.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: candidate.name,
+      product_id: lastManualDocumentProductId
+    })
+  });
+  const result = await parseJsonResponse(response, `PUT /documents/${candidate.id}`);
+  await loadDocuments();
+  await loadProducts();
+  await loadSelectedProductSummary();
+  setDocumentStatus(`Dokument #${candidate.id} zarazen do ${(result?.document && productsMap[result.document.product_id]) || 'posledniho cile'}.`, 'ok');
+  await continueWorkbenchQueue('unsorted');
 }
 
 async function continueWorkbenchQueue(prefer = null) {

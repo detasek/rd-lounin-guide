@@ -607,6 +607,9 @@ Stage 2 – STRUKTURA
     - visible triage labels on cards
     - remembers last manual target product for repeated `Bez navrhu` assignment
     - visible `DONE` state when staging no longer contains actionable documents
+    - fast actions:
+      - `Presunout dalsi doporuceny`
+      - `Zaradit dalsi bez navrhu do posledniho cile`
 
 ---
 
