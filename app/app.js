@@ -6,6 +6,7 @@ let selectedProductId = null;
 let receiptFilter = 'all';
 let mediaFilter = 'all';
 let documentFilter = 'all';
+let documentScope = 'selected';
 let diaryFilter = 'all';
 let focusedReceiptId = null;
 let openReceiptEditorId = null;
@@ -551,12 +552,42 @@ function setDocumentFilter(filter) {
   loadDocuments();
 }
 
+function setDocumentScope(scope) {
+  documentScope = scope;
+  updateDocumentScopeButtons();
+  loadDocuments();
+}
+
+async function focusProductDocuments(productId, filter = 'all') {
+  selectedProductId = Number(productId);
+  documentScope = 'selected';
+  documentFilter = filter;
+  updateDocumentScopeButtons();
+  updateDocumentFilterButtons();
+  updateReceiptToolbar([]);
+  await loadDocuments();
+  await loadPhotos();
+  await loadReceipts();
+  await loadWatchFolderMedia();
+  syncDiaryProductToSelection();
+  await loadSelectedProductSummary();
+  scrollToSection('documentsList');
+}
+
 function updateDocumentFilterButtons() {
-  const ids = ['all', 'pdf', 'image', 'other'];
+  const ids = ['all', 'pdf', 'image', 'other', 'suggested'];
   ids.forEach((id) => {
     const btn = document.getElementById(`document-filter-${id}`);
     if (!btn) return;
     btn.classList.toggle('active', documentFilter === id);
+  });
+}
+
+function updateDocumentScopeButtons() {
+  ['selected', 'all'].forEach((scope) => {
+    const btn = document.getElementById(`document-scope-${scope}`);
+    if (!btn) return;
+    btn.classList.toggle('active', documentScope === scope);
   });
 }
 
@@ -567,28 +598,128 @@ function setDocumentStatus(message, kind = '') {
   el.textContent = message || '';
 }
 
+function buildProductOptions(selectedId) {
+  const entries = Object.entries(productsMap);
+  return entries.map(([id, name]) =>
+    `<option value="${esc(id)}" ${String(selectedId) === String(id) ? 'selected' : ''}>${esc(name)}</option>`
+  ).join('');
+}
+
+function suggestDocumentTarget(doc) {
+  const haystack = normalizeProductKey([
+    doc.name,
+    doc.original_name,
+    doc.file_path
+  ].filter(Boolean).join(' '));
+
+  const rules = [
+    { keywords: ['fve', 'stridac', 'deye', 'solarni', 'panel'], target: 'FVE' },
+    { keywords: ['okna', 'okno', 'dvere', 'sokol okna'], target: 'Svisla okna a dvere' },
+    { keywords: ['stresni okna', 'stresni'], target: 'Stresni okna' },
+    { keywords: ['zaluzie', 'rolety', 'stineni'], target: 'Stineni' },
+    { keywords: ['podlahove topeni', 'podlahovka', 'rozdělovac', 'rozdelo', 'okruhy'], target: 'Podlahove topeni' },
+    { keywords: ['anhydrit', 'zalivka', 'beton podlah', 'lite podlahy'], target: 'Podlahove souvrstvi' },
+    { keywords: ['tepelne cerpadlo', 'tč', 'tc ', 'acond', 'ivt', 'stiebel', 'ctc', 'klimotop', 'pzp', 'reo heating', 'ac heating'], target: 'Tepelne cerpadlo' },
+    { keywords: ['rekuperace', 'vzduchotechnika', 'nilan', 'regulus', 'zehnder', 'storc'], target: 'Rekuperacni jednotka' },
+    { keywords: ['potrubi', 'vyustky', 'rozvody rekuperace'], target: 'Rozvody rekuperace' },
+    { keywords: ['zakladova deska', 'dek konfigurator'], target: 'Zakladova deska' },
+    { keywords: ['zdivo', 'cihly', 'wienerberger'], target: 'Zdivo' },
+    { keywords: ['stropy', 'miako', 'spiroll', 'prefa'], target: 'Stropy' },
+    { keywords: ['strecha', 'krytina'], target: 'Stresni plast' },
+    { keywords: ['vodomerna sachta', 'pripojky', 'cetin', 'cez', 'vak', 'gridservices', 'site'], target: 'Inzenyrske site a pripojky' },
+    { keywords: ['jimka', 'destova voda', 'destovka', 'retencni'], target: 'Destove hospodarstvi' },
+    { keywords: ['zemni prace', 'rypadlo', 'dumper'], target: 'Zemni prace' }
+  ];
+
+  const match = rules.find((rule) => rule.keywords.some((keyword) => haystack.includes(normalizeProductKey(keyword))));
+  if (!match) return null;
+
+  const entry = Object.entries(productsMap).find(([, name]) => normalizeProductKey(name) === normalizeProductKey(match.target));
+  if (!entry) return null;
+
+  return { productId: Number(entry[0]), productName: entry[1] };
+}
+
+function buildSuggestedDocumentBuckets(docsWithSuggestion) {
+  const buckets = new Map();
+
+  docsWithSuggestion.forEach((doc) => {
+    const suggestion = doc._suggestion;
+    if (!suggestion || Number(suggestion.productId) === Number(doc.product_id)) return;
+
+    const key = String(suggestion.productId);
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        productId: suggestion.productId,
+        productName: suggestion.productName,
+        count: 0,
+        ids: []
+      });
+    }
+
+    const bucket = buckets.get(key);
+    bucket.count += 1;
+    bucket.ids.push(doc.id);
+  });
+
+  return Array.from(buckets.values()).sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return String(a.productName).localeCompare(String(b.productName), 'cs');
+  });
+}
+
 async function loadDocuments() {
   const el = document.getElementById('documentsList');
   const summaryEl = document.getElementById('documentSummary');
+  const suggestionsEl = document.getElementById('documentSuggestions');
   if (!el) return;
 
-  const path = selectedProductId ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
   const docs = await apiGet(path);
+  const docsWithSuggestion = docs.map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }));
   const pdfCount = docs.filter((doc) => getDocumentKind(doc) === 'pdf').length;
   const imageCount = docs.filter((doc) => getDocumentKind(doc) === 'image').length;
   const otherCount = docs.filter((doc) => getDocumentKind(doc) === 'other').length;
   const duplicateMap = buildDocumentDuplicateMap(docs);
+  const suggestedCount = docsWithSuggestion.filter((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id)).length;
   const duplicateCount = docs.filter((doc) => {
     const key = `${doc.file_path || ''}::${doc.original_name || doc.name || ''}`;
     return (duplicateMap.get(key) || 0) > 1;
   }).length;
-  const visibleDocs = docs.filter((doc) => documentFilter === 'all' ? true : getDocumentKind(doc) === documentFilter);
+  const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
+  const visibleDocs = docsWithSuggestion.filter((doc) => {
+    if (documentFilter === 'all') return true;
+    if (documentFilter === 'suggested') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+    return getDocumentKind(doc) === documentFilter;
+  });
 
   el.innerHTML = '';
 
   if (summaryEl) {
     summaryEl.textContent =
-      `Documents: ${docs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | filtr: ${documentFilter}`;
+      `Documents: ${docs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | scope: ${documentScope} | filtr: ${documentFilter}`;
+  }
+
+  if (suggestionsEl) {
+    if (!suggestionBuckets.length) {
+      suggestionsEl.textContent = 'Navrhy trideni: zadne.';
+    } else {
+      suggestionsEl.innerHTML = `
+        <div class="card">
+          <b>Navrhy trideni</b>
+          ${suggestionBuckets.map((bucket) => `
+            <div style="margin-top:8px;">
+              <div>${esc(bucket.productName)}: ${bucket.count}</div>
+              <div class="row-actions">
+                <button type="button" class="ghost-btn" onclick="moveSuggestedDocumentsToProduct(${bucket.productId}, ${JSON.stringify(bucket.productName)})">Presunout sem ${bucket.count}</button>
+                <button type="button" class="ghost-btn" onclick="openSuggestedProduct(${bucket.productId}, ${JSON.stringify(bucket.productName)})">Otevrit produkt</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
   }
 
   if (!visibleDocs.length) {
@@ -596,9 +727,11 @@ async function loadDocuments() {
       documentFilter === 'pdf' ? 'Zadne PDF dokumenty.' :
       documentFilter === 'image' ? 'Zadne obrazkove dokumenty.' :
       documentFilter === 'other' ? 'Zadne ostatni dokumenty.' :
+      documentFilter === 'suggested' ? 'Zadne doporucene presuny.' :
       'Zadne dokumenty.';
     el.innerHTML = `<div class="muted">${label}</div>`;
     updateDocumentFilterButtons();
+    updateDocumentScopeButtons();
     return;
   }
 
@@ -612,12 +745,16 @@ async function loadDocuments() {
     const createdAt = formatDateTime(doc.created_at || '-');
     const duplicateKey = `${doc.file_path || ''}::${doc.original_name || doc.name || ''}`;
     const isDuplicate = (duplicateMap.get(duplicateKey) || 0) > 1;
+    const suggestion = doc._suggestion;
+    const currentProductName = productsMap[doc.product_id] || `produkt #${doc.product_id}`;
 
     el.innerHTML += `
       <div class="card">
         <img src="${qrUrl(doc.id)}" style="float:right;width:40px;height:40px;">
         <a href="#" onclick="openMediaViewer('${url}', '${esc(doc.mime_type || '')}');return false;"><b>${docIcon(doc)} ${esc(docName)}</b></a>
         ${isDuplicate ? `<div class="muted" style="color:#b45309;">Mozna duplicita</div>` : ''}
+        <div class="muted">Aktualne: ${esc(currentProductName)}</div>
+        ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<div class="muted" style="color:#0f766e;">Doporuceno presunout do: ${esc(suggestion.productName)}</div>` : ''}
         <div class="muted">${esc(doc.mime_type || '-')} | Vytvoreno: ${esc(createdAt)}</div>
         <div class="muted">Cesta: ${esc(absolutePath)}</div>
         <div class="row-actions">
@@ -625,11 +762,17 @@ async function loadDocuments() {
           <button class="ghost-btn" onclick="toggleDocumentEditor(${doc.id})">Upravit nazev</button>
           <button class="ghost-btn" onclick='copyText(${JSON.stringify(docName)}, "Nazev zkopirovan.")'>Kopirovat nazev</button>
           <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopirovana.")'>Kopirovat cestu</button>
+          ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<button class="ghost-btn" onclick="openSuggestedProduct(${suggestion.productId}, ${JSON.stringify(suggestion.productName)})">Otevrit doporuceny produkt</button>` : ''}
           <button class="ghost-btn" onclick="deleteDocument(${doc.id})">Smazat</button>
         </div>
         <div style="display:${shouldOpenEditor ? 'block' : 'none'};margin-bottom:8px;">
           <input id="document-name-${doc.id}" value="${esc(docName)}" placeholder="nazev dokumentu">
+          <select id="document-product-${doc.id}">
+            ${buildProductOptions(doc.product_id)}
+          </select>
           <button class="ghost-btn" onclick="saveDocumentName(${doc.id})">Ulozit nazev</button>
+          <button class="ghost-btn" onclick="moveDocumentToSelectedProduct(${doc.id})">Presunout na vybrany produkt</button>
+          ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<button class="ghost-btn" onclick="moveDocumentToSuggestedProduct(${doc.id}, ${suggestion.productId}, ${JSON.stringify(suggestion.productName)})">Presunout na doporuceny</button>` : ''}
         </div>
         <div id="preview-${doc.id}" style="display:none;">
           ${isPdf ? `<iframe src="${url}" style="width:100%;height:400px;"></iframe>` : ''}
@@ -641,6 +784,80 @@ async function loadDocuments() {
 
   openDocumentEditorId = null;
   updateDocumentFilterButtons();
+  updateDocumentScopeButtons();
+}
+
+async function moveAllSuggestedDocuments() {
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const candidates = docs
+    .map((doc) => ({ doc, suggestion: suggestDocumentTarget(doc) }))
+    .filter((item) => item.suggestion && Number(item.suggestion.productId) !== Number(item.doc.product_id));
+
+  if (!candidates.length) {
+    setDocumentStatus('Zadne doporucene presuny.', 'ok');
+    return;
+  }
+
+  let moved = 0;
+
+  for (const item of candidates) {
+    const response = await fetch(`${API_BASE}/documents/${item.doc.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: item.doc.name,
+        product_id: item.suggestion.productId
+      })
+    });
+    await parseJsonResponse(response, `PUT /documents/${item.doc.id}`);
+    moved += 1;
+  }
+
+  await loadDocuments();
+  await loadProducts();
+  await loadSelectedProductSummary();
+  setDocumentStatus(`Presunuto doporucene: ${moved}.`, 'ok');
+}
+
+async function moveSuggestedDocumentsToProduct(productId, productName) {
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const candidates = docs
+    .map((doc) => ({ doc, suggestion: suggestDocumentTarget(doc) }))
+    .filter((item) => item.suggestion && Number(item.suggestion.productId) === Number(productId) && Number(item.doc.product_id) !== Number(productId));
+
+  if (!candidates.length) {
+    setDocumentStatus(`Zadne dokumenty k presunu do ${productName}.`, 'ok');
+    return;
+  }
+
+  let moved = 0;
+
+  for (const item of candidates) {
+    const response = await fetch(`${API_BASE}/documents/${item.doc.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: item.doc.name,
+        product_id: item.suggestion.productId
+      })
+    });
+    await parseJsonResponse(response, `PUT /documents/${item.doc.id}`);
+    moved += 1;
+  }
+
+  await loadDocuments();
+  await loadProducts();
+  await loadSelectedProductSummary();
+  setDocumentStatus(`Presunuto do ${productName}: ${moved}.`, 'ok');
+}
+
+async function openSuggestedProduct(productId, productName) {
+  await focusProductDocuments(productId, 'all');
+  setDocumentStatus(`Otevren produkt ${productName}.`, 'ok');
 }
 
 function toggleDocumentEditor(id) {
@@ -650,19 +867,79 @@ function toggleDocumentEditor(id) {
 
 async function saveDocumentName(id) {
   const input = document.getElementById(`document-name-${id}`);
+  const productInput = document.getElementById(`document-product-${id}`);
   if (!input) return;
 
   try {
     const response = await fetch(`${API_BASE}/documents/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: input.value })
+      body: JSON.stringify({
+        name: input.value,
+        product_id: productInput ? productInput.value : undefined
+      })
     });
     await parseJsonResponse(response, `PUT /documents/${id}`);
     openDocumentEditorId = null;
     await loadDocuments();
+    await loadProducts();
     await loadSelectedProductSummary();
+    setDocumentStatus(`Dokument #${id} ulozen.`, 'ok');
   } catch (e) {
+    setDocumentStatus(`MISS: ${e.message}`, 'miss');
+    alert(`MISS: ${e.message}`);
+  }
+}
+
+async function moveDocumentToSelectedProduct(id) {
+  if (!selectedProductId) {
+    setDocumentStatus('MISS: nejdriv vyber produkt', 'miss');
+    return;
+  }
+
+  const nameInput = document.getElementById(`document-name-${id}`);
+
+  try {
+    const response = await fetch(`${API_BASE}/documents/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: nameInput ? nameInput.value : undefined,
+        product_id: selectedProductId
+      })
+    });
+    await parseJsonResponse(response, `PUT /documents/${id}`);
+    openDocumentEditorId = null;
+    await loadDocuments();
+    await loadProducts();
+    await loadSelectedProductSummary();
+    setDocumentStatus(`Dokument #${id} presunut na produkt ${selectedProductName()}.`, 'ok');
+  } catch (e) {
+    setDocumentStatus(`MISS: ${e.message}`, 'miss');
+    alert(`MISS: ${e.message}`);
+  }
+}
+
+async function moveDocumentToSuggestedProduct(id, productId, productName) {
+  const nameInput = document.getElementById(`document-name-${id}`);
+
+  try {
+    const response = await fetch(`${API_BASE}/documents/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: nameInput ? nameInput.value : undefined,
+        product_id: productId
+      })
+    });
+    await parseJsonResponse(response, `PUT /documents/${id}`);
+    openDocumentEditorId = null;
+    await loadDocuments();
+    await loadProducts();
+    await loadSelectedProductSummary();
+    setDocumentStatus(`Dokument #${id} presunut do ${productName}.`, 'ok');
+  } catch (e) {
+    setDocumentStatus(`MISS: ${e.message}`, 'miss');
     alert(`MISS: ${e.message}`);
   }
 }

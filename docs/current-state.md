@@ -549,6 +549,43 @@ Stage 2 – STRUKTURA
     - product group
     - upload hint
 
+## Document move between products minimum 2026-05-06
+- FIX applied:
+  - documents backend update now supports changing `product_id`
+  - target `product_id` is validated before save
+  - document card editor now includes:
+    - product select
+    - action to move document to currently selected product
+  - after document move frontend refreshes:
+    - documents list
+    - products list
+    - selected product summary
+
+## Document suggested target minimum 2026-05-06
+- FIX applied:
+  - document UI now computes suggested target product from:
+    - document name
+    - original name
+    - file path
+  - suggestion is heuristic only, not automatic
+  - if suggestion differs from current product, card now shows:
+    - suggested target product label
+    - quick action to move document to suggested product
+  - documents section now also supports:
+    - `Doporucene` filter
+    - bulk action to move all suggested documents in current scope
+    - grouped suggestion summary by target product
+    - bulk move into one specific suggested target product
+  - document card now also shows:
+    - current assigned product
+    - suggested target product side by side in visible triage flow
+  - documents section now supports scope:
+    - selected product only
+    - all products
+  - suggested target actions now also support:
+    - open suggested product from document card
+    - open target product from grouped suggestion summary
+
 ---
 
 ## WATCH-FOLDER MEDIA CHECKPOINT (2026-05-06)

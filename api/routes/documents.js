@@ -118,25 +118,44 @@ router.put('/:id', (req, res) => {
   const id = req.params.id;
   const body = req.body || {};
   const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const product_id = body.product_id;
 
   db.get(`SELECT * FROM documents WHERE id = ?`, [id], (findErr, row) => {
     if (findErr) return res.status(500).json({ error: findErr.message });
     if (!row) return res.status(404).json({ error: 'Not found' });
 
-    db.run(
-      `UPDATE documents
-       SET name = ?
-       WHERE id = ?`,
-      [name || row.name || row.original_name || null, id],
-      function(updateErr) {
-        if (updateErr) return res.status(500).json({ error: updateErr.message });
+    const finalName = name || row.name || row.original_name || null;
+    const finalProductId = product_id === undefined || product_id === null || product_id === ''
+      ? row.product_id
+      : Number(product_id);
 
-        db.get(`SELECT * FROM documents WHERE id = ?`, [id], (getErr, updated) => {
-          if (getErr) return res.status(500).json({ error: getErr.message });
-          res.json({ success: true, document: updated });
-        });
-      }
-    );
+    const doUpdate = () => {
+      db.run(
+        `UPDATE documents
+         SET name = ?, product_id = ?
+         WHERE id = ?`,
+        [finalName, finalProductId, id],
+        function(updateErr) {
+          if (updateErr) return res.status(500).json({ error: updateErr.message });
+
+          db.get(`SELECT * FROM documents WHERE id = ?`, [id], (getErr, updated) => {
+            if (getErr) return res.status(500).json({ error: getErr.message });
+            res.json({ success: true, document: updated });
+          });
+        }
+      );
+    };
+
+    if (finalProductId !== null && finalProductId !== row.product_id) {
+      return ensureProductExists(finalProductId, (productErr) => {
+        if (productErr) {
+          return res.status(productErr.message === 'invalid product_id' ? 400 : 500).json({ error: productErr.message });
+        }
+        doUpdate();
+      });
+    }
+
+    doUpdate();
   });
 });
 
