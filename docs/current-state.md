@@ -605,6 +605,7 @@ Stage 2 – STRUKTURA
       - `Jen doporucene`
       - `Jen bez navrhu`
     - visible triage labels on cards
+    - remembers last manual target product for repeated `Bez navrhu` assignment
 
 ---
 

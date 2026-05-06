@@ -13,6 +13,7 @@ let openReceiptEditorId = null;
 let openMediaEditorId = null;
 let openDocumentEditorId = null;
 let lastWatchFolderCounts = { total: 0, image: 0, video: 0, file: 0 };
+let lastManualDocumentProductId = null;
 const PROJECT_DOCS_WORKBENCH = 'projektova dokumentace rd';
 
 const STARTER_PRODUCTS_TOP8 = [
@@ -630,9 +631,12 @@ function updateDocumentUnsortedTargetOptions() {
   const select = document.getElementById('document-unsorted-target');
   if (!select) return;
   const currentValue = select.value;
-  select.innerHTML = buildProductOptions(currentValue || selectedProductId || '');
+  const preferredValue = currentValue || lastManualDocumentProductId || selectedProductId || '';
+  select.innerHTML = buildProductOptions(preferredValue);
   if (currentValue && Array.from(select.options).some((option) => option.value === currentValue)) {
     select.value = currentValue;
+  } else if (lastManualDocumentProductId && Array.from(select.options).some((option) => Number(option.value) === Number(lastManualDocumentProductId))) {
+    select.value = String(lastManualDocumentProductId);
   } else if (selectedProductId && Array.from(select.options).some((option) => Number(option.value) === Number(selectedProductId))) {
     select.value = String(selectedProductId);
   }
@@ -786,6 +790,7 @@ async function loadDocuments() {
         <div class="card">
           <b>Workbench trideni</b>
           <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporucene: ${actionableSuggested.length} | bez navrhu: ${actionableUnsorted.length} | hotovo: ${triageDone}/${docs.length} (${triagePct}%)</div>
+          <div class="muted" style="margin-top:6px;">Posledni rucni cil: ${lastManualDocumentProductId ? esc(productsMap[lastManualDocumentProductId] || `produkt #${lastManualDocumentProductId}`) : 'zadny'}</div>
           <div class="row-actions" style="margin-top:8px;">
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('all')">Vse ve stagingu</button>
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('suggested')">Jen doporucene</button>
@@ -842,7 +847,7 @@ async function loadDocuments() {
         ${!suggestion ? `
         <div class="row-actions" style="margin-top:8px;">
           <select id="document-quick-product-${doc.id}">
-            ${buildProductOptions(doc.product_id)}
+            ${buildProductOptions(lastManualDocumentProductId || doc.product_id)}
           </select>
           <button class="ghost-btn" onclick="moveDocumentToQuickProduct(${doc.id})">Rychle zaradit</button>
         </div>
@@ -933,6 +938,7 @@ async function moveAllUnsortedDocuments() {
     return;
   }
 
+  lastManualDocumentProductId = Number(targetProductId);
   let moved = 0;
 
   for (const item of candidates) {
@@ -1169,6 +1175,7 @@ async function moveDocumentToQuickProduct(id) {
   }
 
   try {
+    lastManualDocumentProductId = Number(productInput.value);
     const response = await fetch(`${API_BASE}/documents/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
