@@ -141,6 +141,7 @@
     <div class="row-actions">
       <input id="documentSearch" placeholder="Hledat v dokumentech..." oninput="setDocumentSearch(this.value)">
       <button type="button" class="ghost-btn" onclick="clearDocumentSearch()">Vymazat hledani</button>
+      <button type="button" class="ghost-btn" onclick="copyVisibleDocumentsList()">Kopirovat seznam</button>
       <select id="documentSort" onchange="setDocumentSort(this.value)">
         <option value="newest">Nejnovejsi</option>
         <option value="oldest">Nejstarsi</option>
@@ -259,7 +260,7 @@
   </section>
 
   <script src="config.js"></script>
-  <script src="app.js?v=10108"></script>
+  <script src="app.js?v=10109"></script>
 
   <div id="lightbox" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000c;justify-content:center;align-items:center;z-index:9999;">
     <button id="lightboxClose" type="button" class="ghost-btn" style="position:absolute;top:16px;right:16px;z-index:10000;">Zavrit</button>

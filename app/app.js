@@ -762,6 +762,24 @@ function sortDocumentsForView(docs) {
   return items;
 }
 
+function getVisibleDocumentsForCurrentView(docs) {
+  const docsWithSuggestion = docs.map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }));
+  return sortDocumentsForView(docsWithSuggestion.filter((doc) => {
+    if (documentSearch) {
+      const haystack = [
+        doc.name,
+        doc.original_name,
+        doc.file_path
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(documentSearch)) return false;
+    }
+    if (documentFilter === 'all') return true;
+    if (documentFilter === 'suggested') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+    if (documentFilter === 'unsorted') return !doc._suggestion;
+    return getDocumentKind(doc) === documentFilter;
+  }));
+}
+
 async function loadDocuments() {
   const el = document.getElementById('documentsList');
   const summaryEl = document.getElementById('documentSummary');
@@ -787,20 +805,7 @@ async function loadDocuments() {
   const actionableUnsorted = docsWithSuggestion.filter((doc) => !doc._suggestion);
   const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
   const inWorkbench = scopedToSelected && isProjectDocsWorkbench(selectedProductName());
-  const visibleDocs = sortDocumentsForView(docsWithSuggestion.filter((doc) => {
-    if (documentSearch) {
-      const haystack = [
-        doc.name,
-        doc.original_name,
-        doc.file_path
-      ].filter(Boolean).join(' ').toLowerCase();
-      if (!haystack.includes(documentSearch)) return false;
-    }
-    if (documentFilter === 'all') return true;
-    if (documentFilter === 'suggested') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
-    if (documentFilter === 'unsorted') return !doc._suggestion;
-    return getDocumentKind(doc) === documentFilter;
-  }));
+  const visibleDocs = getVisibleDocumentsForCurrentView(docs);
 
   el.innerHTML = '';
 
@@ -975,6 +980,29 @@ async function moveAllSuggestedDocuments() {
   await loadProducts();
   await loadSelectedProductSummary();
   setDocumentStatus(`Presunuto doporucene: ${moved}.`, 'ok');
+}
+
+async function copyVisibleDocumentsList() {
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const visibleDocs = getVisibleDocumentsForCurrentView(docs);
+
+  if (!visibleDocs.length) {
+    setDocumentStatus('Zadne viditelne dokumenty ke kopirovani.', 'ok');
+    return;
+  }
+
+  const lines = visibleDocs.map((doc, index) => {
+    const suggestion = doc._suggestion;
+    const current = productsMap[doc.product_id] || `produkt #${doc.product_id}`;
+    const target = suggestion && Number(suggestion.productId) !== Number(doc.product_id)
+      ? ` -> ${suggestion.productName}`
+      : '';
+    return `${index + 1}. ${doc.name || doc.original_name || 'dokument'} | ${current}${target} | ${doc.file_path || ''}`;
+  });
+
+  await copyText(lines.join('\n'), `Zkopirovano ${visibleDocs.length} dokumentu.`);
 }
 
 async function moveAllUnsortedDocuments() {

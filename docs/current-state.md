@@ -620,6 +620,7 @@ Stage 2 – STRUKTURA
       - name A-Z
       - suggested first
       - unsorted first
+    - copy export of currently visible document list
 
 ---
 
