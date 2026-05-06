@@ -621,6 +621,10 @@ Stage 2 – STRUKTURA
       - suggested first
       - unsorted first
     - copy export of currently visible document list
+    - visible triage distribution summary:
+      - top current product buckets
+      - top target move buckets
+      - unsorted count
 
 ---
 

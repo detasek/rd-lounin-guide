@@ -738,6 +738,22 @@ function buildSuggestedDocumentBuckets(docsWithSuggestion) {
   });
 }
 
+function buildCurrentDocumentBuckets(docs) {
+  const buckets = new Map();
+  docs.forEach((doc) => {
+    const key = String(doc.product_id || '');
+    const name = productsMap[doc.product_id] || `produkt #${doc.product_id}`;
+    if (!buckets.has(key)) {
+      buckets.set(key, { productId: doc.product_id, productName: name, count: 0 });
+    }
+    buckets.get(key).count += 1;
+  });
+  return Array.from(buckets.values()).sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return String(a.productName).localeCompare(String(b.productName), 'cs');
+  });
+}
+
 function sortDocumentsForView(docs) {
   const items = [...docs];
   const nameOf = (doc) => String(doc.name || doc.original_name || '').toLowerCase();
@@ -784,6 +800,7 @@ async function loadDocuments() {
   const el = document.getElementById('documentsList');
   const summaryEl = document.getElementById('documentSummary');
   const suggestionsEl = document.getElementById('documentSuggestions');
+  const triageSummaryEl = document.getElementById('documentTriageSummary');
   const workbenchEl = document.getElementById('documentWorkbench');
   if (!el) return;
 
@@ -804,6 +821,7 @@ async function loadDocuments() {
   const actionableSuggested = docsWithSuggestion.filter((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
   const actionableUnsorted = docsWithSuggestion.filter((doc) => !doc._suggestion);
   const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
+  const currentBuckets = buildCurrentDocumentBuckets(docsWithSuggestion);
   const inWorkbench = scopedToSelected && isProjectDocsWorkbench(selectedProductName());
   const visibleDocs = getVisibleDocumentsForCurrentView(docs);
 
@@ -834,6 +852,13 @@ async function loadDocuments() {
         </div>
       `;
     }
+  }
+
+  if (triageSummaryEl) {
+    const currentTop = currentBuckets.slice(0, 5).map((bucket) => `${bucket.productName}: ${bucket.count}`).join(' | ');
+    const targetTop = suggestionBuckets.slice(0, 5).map((bucket) => `${bucket.productName}: ${bucket.count}`).join(' | ');
+    triageSummaryEl.textContent =
+      `Rozlozeni: ${currentTop || '-'} | cilove presuny: ${targetTop || '-'} | bez navrhu: ${unsortedCount}`;
   }
 
   if (workbenchEl) {
