@@ -630,7 +630,7 @@ async function focusProductDocuments(productId, filter = 'all') {
 }
 
 function updateDocumentFilterButtons() {
-  const ids = ['all', 'pdf', 'image', 'other', 'suggested', 'unsorted'];
+  const ids = ['all', 'pdf', 'image', 'other', 'todo', 'suggested', 'unsorted'];
   ids.forEach((id) => {
     const btn = document.getElementById(`document-filter-${id}`);
     if (!btn) return;
@@ -805,6 +805,7 @@ function getVisibleDocumentsForCurrentView(docs) {
       if (!haystack.includes(documentSearch)) return false;
     }
     if (documentFilter === 'all') return true;
+    if (documentFilter === 'todo') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id)) || !doc._suggestion;
     if (documentFilter === 'suggested') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
     if (documentFilter === 'unsorted') return !doc._suggestion;
     return getDocumentKind(doc) === documentFilter;
@@ -891,6 +892,7 @@ async function loadDocuments() {
           <div class="muted" style="margin-top:6px;">Posledni rucni cil: ${lastManualDocumentProductId ? esc(productsMap[lastManualDocumentProductId] || `produkt #${lastManualDocumentProductId}`) : 'zadny'}</div>
           <div class="row-actions" style="margin-top:8px;">
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('all')">Vse ve stagingu</button>
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('todo')">Jen k reseni</button>
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('suggested')">Jen doporucene</button>
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('unsorted')">Jen bez navrhu</button>
           </div>
@@ -912,6 +914,7 @@ async function loadDocuments() {
       documentFilter === 'pdf' ? 'Zadne PDF dokumenty.' :
       documentFilter === 'image' ? 'Zadne obrazkove dokumenty.' :
       documentFilter === 'other' ? 'Zadne ostatni dokumenty.' :
+      documentFilter === 'todo' ? 'Zadne dokumenty k reseni.' :
       documentFilter === 'suggested' ? 'Zadne doporucene presuny.' :
       documentFilter === 'unsorted' ? 'Zadne dokumenty bez navrhu.' :
       documentSearch ? 'Hledani nic nenaslo.' :
