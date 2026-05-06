@@ -614,6 +614,12 @@ Stage 2 – STRUKTURA
       - current name
       - original name
       - file path
+    - document sorting modes:
+      - newest
+      - oldest
+      - name A-Z
+      - suggested first
+      - unsorted first
 
 ---
 

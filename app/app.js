@@ -8,6 +8,7 @@ let mediaFilter = 'all';
 let documentFilter = 'all';
 let documentScope = 'selected';
 let documentSearch = '';
+let documentSort = 'newest';
 let diaryFilter = 'all';
 let focusedReceiptId = null;
 let openReceiptEditorId = null;
@@ -607,6 +608,11 @@ function clearDocumentSearch() {
   loadDocuments();
 }
 
+function setDocumentSort(value) {
+  documentSort = value || 'newest';
+  loadDocuments();
+}
+
 async function focusProductDocuments(productId, filter = 'all') {
   selectedProductId = Number(productId);
   documentScope = 'selected';
@@ -732,6 +738,30 @@ function buildSuggestedDocumentBuckets(docsWithSuggestion) {
   });
 }
 
+function sortDocumentsForView(docs) {
+  const items = [...docs];
+  const nameOf = (doc) => String(doc.name || doc.original_name || '').toLowerCase();
+  const createdOf = (doc) => new Date(doc.created_at || 0).getTime();
+  const isSuggested = (doc) => !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+  const isUnsorted = (doc) => !doc._suggestion;
+
+  items.sort((a, b) => {
+    if (documentSort === 'oldest') return createdOf(a) - createdOf(b);
+    if (documentSort === 'name') return nameOf(a).localeCompare(nameOf(b), 'cs');
+    if (documentSort === 'suggested-first') {
+      if (isSuggested(a) !== isSuggested(b)) return isSuggested(a) ? -1 : 1;
+      return createdOf(b) - createdOf(a);
+    }
+    if (documentSort === 'unsorted-first') {
+      if (isUnsorted(a) !== isUnsorted(b)) return isUnsorted(a) ? -1 : 1;
+      return createdOf(b) - createdOf(a);
+    }
+    return createdOf(b) - createdOf(a);
+  });
+
+  return items;
+}
+
 async function loadDocuments() {
   const el = document.getElementById('documentsList');
   const summaryEl = document.getElementById('documentSummary');
@@ -757,7 +787,7 @@ async function loadDocuments() {
   const actionableUnsorted = docsWithSuggestion.filter((doc) => !doc._suggestion);
   const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
   const inWorkbench = scopedToSelected && isProjectDocsWorkbench(selectedProductName());
-  const visibleDocs = docsWithSuggestion.filter((doc) => {
+  const visibleDocs = sortDocumentsForView(docsWithSuggestion.filter((doc) => {
     if (documentSearch) {
       const haystack = [
         doc.name,
@@ -770,13 +800,13 @@ async function loadDocuments() {
     if (documentFilter === 'suggested') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
     if (documentFilter === 'unsorted') return !doc._suggestion;
     return getDocumentKind(doc) === documentFilter;
-  });
+  }));
 
   el.innerHTML = '';
 
   if (summaryEl) {
     summaryEl.textContent =
-      `Documents: ${docs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | scope: ${documentScope} | filtr: ${documentFilter} | hledani: ${documentSearch || '-'}`;
+      `Documents: ${docs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | scope: ${documentScope} | filtr: ${documentFilter} | hledani: ${documentSearch || '-'} | razeni: ${documentSort}`;
   }
 
   if (suggestionsEl) {
@@ -909,6 +939,8 @@ async function loadDocuments() {
   updateDocumentFilterButtons();
   updateDocumentScopeButtons();
   updateDocumentUnsortedTargetOptions();
+  const sortSelect = document.getElementById('documentSort');
+  if (sortSelect && sortSelect.value !== documentSort) sortSelect.value = documentSort;
 }
 
 async function moveAllSuggestedDocuments() {
