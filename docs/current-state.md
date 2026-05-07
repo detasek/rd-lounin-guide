@@ -804,3 +804,30 @@ Finalni deploy balik na NAS:
 
 NAS cleanup:
 - odstranit historicke `.bak` / `backup` soubory z `api`, `app`, `docs`, pokud tam existuji
+
+---
+
+## REFACTOR CHECKPOINT - LARGE SAFE REFACTOR (2026-05-07)
+
+Refaktor proveden po samostatnych commitech:
+- `scripts/smoke-check.js`:
+  - syntakticka kontrola aktivnich JS souboru
+  - drift check pevne LAN IP, `.bak` artefaktu, `photos.updated_at`
+  - kontrola frontend entry souboru
+- CSS refaktor:
+  - inline CSS presunuto z `app/index.html` do `app/styles.css`
+  - `index.html` nyni nacita `styles.css`
+- Frontend API helper refaktor:
+  - pridano `apiPut`
+  - pridano `apiDelete`
+  - JSON POST bez payloadu uz neposila prazdne JSON telo
+  - document/receipt/media mutace pouzivaji centralni helpery
+- Backend runtime path refaktor:
+  - pridano `api/lib/runtimePaths.js`
+  - centralizovany `DB_PATH`, `UPLOADS_DIR`, `RECEIPTS_DIR`, `WATCH_MEDIA_DIR`
+  - routes uz neskladaji runtime `/data` cesty napric kodem ručně
+
+Finalni kontrola po refaktoru:
+- spustit `node scripts/smoke-check.js`
+- spustit syntax check aktivnich JS souboru
+- pred NAS deployem nahrat i novy `api/lib/runtimePaths.js`
