@@ -1,4 +1,16 @@
-const API_BASE = window.APP_CONFIG.API_BASE;
+function resolveApiBase() {
+  const configuredBase = window.APP_CONFIG && window.APP_CONFIG.API_BASE ? window.APP_CONFIG.API_BASE : '/api';
+  const isHttpsPage = window.location.protocol === 'https:';
+  const isSameHostAbsoluteBase = configuredBase.includes(`//${window.location.hostname}:`);
+
+  if (isHttpsPage && isSameHostAbsoluteBase) {
+    return '/api';
+  }
+
+  return configuredBase;
+}
+
+const API_BASE = resolveApiBase();
 
 let productsMap = {};
 let phasesMap = {};
