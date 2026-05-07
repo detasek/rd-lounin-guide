@@ -514,6 +514,24 @@ async function bootStatus() {
   }
 }
 
+function markBootMiss(section, error) {
+  const message = `MISS ${section}: ${error.message}`;
+  const apiEl = document.getElementById('apiStatus');
+  if (apiEl) apiEl.textContent = `${apiEl.textContent || ''}\n${message}`.trim();
+  console.error(message, error);
+}
+
+async function runBootStep(section, fn, onError) {
+  try {
+    await fn();
+    return true;
+  } catch (error) {
+    markBootMiss(section, error);
+    if (onError) onError(error);
+    return false;
+  }
+}
+
 async function loadProducts() {
   const el = document.getElementById('productsList');
   const products = sortProductsByGuide(await apiGet('/products'));
@@ -2561,18 +2579,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   const documentSortSelect = document.getElementById('documentSort');
   if (documentSortSelect) documentSortSelect.value = documentSort;
 
-  await bootStatus();
-  await loadProducts();
-  await loadDocuments();
-  await loadPhotos();
-  await loadReceipts();
-  await loadWatchFolderMedia();
-  await loadDiarySelects();
-  await loadDiary();
-  await loadWarrantyDashboard();
-  await loadWarrantyAlerts();
-  await loadWatcherMinimum();
-  await loadSelectedProductSummary();
+  await runBootStep('API status', bootStatus);
+  await runBootStep('produkty', loadProducts, (error) => {
+    const el = document.getElementById('productsList');
+    if (el) el.innerHTML = `<div class="muted status-miss">MISS: ${esc(error.message)}</div>`;
+  });
+  await runBootStep('dokumenty', loadDocuments, (error) => setDocumentStatus(`MISS: ${error.message}`, 'miss'));
+  await runBootStep('media', loadPhotos, (error) => setPhotoStatus(`MISS: ${error.message}`, 'miss'));
+  await runBootStep('receipts', loadReceipts, (error) => setReceiptStatus(`MISS: ${error.message}`, 'miss'));
+  await runBootStep('watch-folder', loadWatchFolderMedia, (error) => setPhotoStatus(`MISS watch-folder: ${error.message}`, 'miss'));
+  await runBootStep('diary selects', loadDiarySelects, (error) => setDiaryStatus(`MISS selects: ${error.message}`, 'miss'));
+  await runBootStep('diary', loadDiary, (error) => setDiaryStatus(`MISS: ${error.message}`, 'miss'));
+  await runBootStep('zaruky', loadWarrantyDashboard);
+  await runBootStep('upozorneni', loadWarrantyAlerts);
+  await runBootStep('watcher', loadWatcherMinimum, (error) => {
+    const el = document.getElementById('watcherSummary');
+    if (el) el.textContent = `MISS: ${error.message}`;
+  });
+  await runBootStep('vybrany produkt', loadSelectedProductSummary);
 });
 
 function openLightbox(url) {

@@ -717,3 +717,29 @@ Nasadit po tomto checkpointu:
 - `app/app.js`
 - `app/index.html`
 - `docs/current-state.md`
+
+---
+
+## STAGE B.2 - NAS VERIFICATION + UX DRIFT PASS (2026-05-07)
+
+Lokalni UX drift checkpoint:
+- Boot flow je odolnejsi:
+  - kazda hlavni sekce se nacita izolovane pres `runBootStep`
+  - chyba jedne sekce nezastavi nacitani dalsich sekci
+  - `API stav` dopisuje konkretni `MISS <sekce>: <chyba>`
+- Document toolbar layout je stabilizovany:
+  - selecty v `.row-actions` uz nezabiraji plnou sirku radku
+  - tlacitka v row actions se nelamou uvnitr textu
+  - upload formulare zustavaji full-width
+- Provedeno:
+  - `git diff --check`
+  - syntax check `app/app.js`
+  - syntax check `app/config.js`
+  - static frontend smoke přes `http.server` vratil HTTP 200
+- Browser plugin vizualni test nebylo mozne dokoncit lokalne:
+  - Node REPL pro browser-use vratil `Pristup byl odepren`
+
+Nasadit po tomto checkpointu:
+- `app/app.js`
+- `app/index.html`
+- `docs/current-state.md`
