@@ -316,6 +316,12 @@ function showAuthMode(mode) {
   if (appShell) appShell.hidden = true;
   if (setupPanel) setupPanel.hidden = mode !== 'setup';
   if (loginPanel) loginPanel.hidden = mode !== 'login';
+  const setupTitle = setupPanel?.querySelector('h2');
+  const setupText = setupPanel?.querySelector('p');
+  const setupButton = setupPanel?.querySelector('button');
+  if (setupTitle) setupTitle.textContent = mode === 'setup' && currentUser === null ? 'Vytvořit účet' : 'První spuštění';
+  if (setupText) setupText.textContent = 'Vytvoř uživatele. PIN bude sloužit pro rychlé přihlášení.';
+  if (setupButton) setupButton.textContent = 'Vytvořit a přihlásit';
 }
 
 function showApplication() {
@@ -376,7 +382,12 @@ async function initAuth() {
 
 async function setupFirstUser() {
   try {
-    const payload = await apiPost('/auth/setup', {
+    let bootstrap = { needs_setup: false };
+    try {
+      bootstrap = await apiGet('/auth/bootstrap');
+    } catch (_) {}
+
+    const payload = await apiPost(bootstrap.needs_setup ? '/auth/setup' : '/auth/register', {
       name: document.getElementById('authName').value.trim(),
       username: document.getElementById('authSetupUsername').value.trim(),
       password: document.getElementById('authSetupPassword').value,

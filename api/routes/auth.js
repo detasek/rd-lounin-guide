@@ -143,6 +143,45 @@ router.post('/setup', (req, res) => {
   });
 });
 
+router.post('/register', (req, res) => {
+  const body = req.body || {};
+  const name = String(body.name || '').trim();
+  const username = String(body.username || '').trim().toLowerCase();
+  const password = String(body.password || '');
+  const pin = String(body.pin || '');
+
+  if (!name || !username || password.length < 6) {
+    return res.status(400).json({ error: 'invalid_registration' });
+  }
+
+  const passwordHash = hashSecret(password);
+  const pinHash = pin ? hashSecret(pin) : { hash: null, salt: null };
+
+  db.run(
+    `
+      INSERT INTO users (name, username, password_hash, password_salt, pin_hash, pin_salt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `,
+    [name, username, passwordHash.hash, passwordHash.salt, pinHash.hash, pinHash.salt],
+    function (insertErr) {
+      if (insertErr) {
+        if (String(insertErr.message || '').includes('UNIQUE')) {
+          return res.status(409).json({ error: 'username_exists' });
+        }
+        return res.status(500).json({ error: insertErr.message });
+      }
+
+      db.get(`SELECT * FROM users WHERE id = ?`, [this.lastID], (getErr, user) => {
+        if (getErr) return res.status(500).json({ error: getErr.message });
+        createSession(user.id, (sessionErr, token, expiresAt) => {
+          if (sessionErr) return res.status(500).json({ error: sessionErr.message });
+          res.status(201).json({ user: publicUser(user), token, expires_at: expiresAt });
+        });
+      });
+    }
+  );
+});
+
 router.post('/login', (req, res) => {
   const body = req.body || {};
   const username = String(body.username || '').trim().toLowerCase();
