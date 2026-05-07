@@ -89,14 +89,11 @@ function applyLayoutMode(mode) {
 
 function initAppShell() {
   let storedTheme = 'light';
-  let storedLayout = 'desktop';
   try {
     storedTheme = window.localStorage.getItem(THEME_KEY) || storedTheme;
-    storedLayout = window.localStorage.getItem(LAYOUT_KEY) || storedLayout;
   } catch (_) {}
 
   applyTheme(storedTheme);
-  applyLayoutMode(storedLayout);
 
   document.querySelectorAll('.nav-link').forEach((button) => {
     button.addEventListener('click', () => {
@@ -111,13 +108,6 @@ function initAppShell() {
   if (themeToggle) {
     themeToggle.addEventListener('click', () => {
       applyTheme(document.body.classList.contains('theme-dark') ? 'light' : 'dark');
-    });
-  }
-
-  const layoutToggle = document.getElementById('layoutToggle');
-  if (layoutToggle) {
-    layoutToggle.addEventListener('click', () => {
-      applyLayoutMode(document.body.classList.contains('compact-mode') ? 'desktop' : 'compact');
     });
   }
 }
@@ -324,6 +314,20 @@ function showAuthMode(mode) {
   if (setupButton) setupButton.textContent = 'Vytvořit a přihlásit';
 }
 
+function friendlyAuthError(error) {
+  const message = String(error?.message || error || '');
+  if (message.includes('username_exists')) return 'Uživatel s tímto loginem už existuje. Zvol jiné uživatelské jméno, nebo se přihlas.';
+  if (message.includes('invalid_registration') || message.includes('invalid_setup')) return 'Vyplň jméno, uživatelské jméno a heslo alespoň 6 znaků.';
+  if (message.includes('invalid_credentials')) return 'Nesedí uživatelské jméno, heslo nebo PIN.';
+  if (message.includes('credentials_required')) return 'Vyplň uživatelské jméno a heslo, nebo PIN.';
+  return `Nepovedlo se dokončit akci: ${message}`;
+}
+
+function toggleHeaderOverview() {
+  const panel = document.getElementById('headerOverviewPanel');
+  if (panel) panel.hidden = !panel.hidden;
+}
+
 function showApplication() {
   const authView = document.getElementById('authView');
   const appShell = document.getElementById('appShell');
@@ -397,8 +401,9 @@ async function setupFirstUser() {
     showApplication();
     await bootApplication();
   } catch (e) {
-    setAuthStatus(`MISS: ${e.message}`, 'miss');
-    alert(`MISS: ${e.message}`);
+    const message = friendlyAuthError(e);
+    setAuthStatus(message, 'miss');
+    alert(message);
   }
 }
 
@@ -413,8 +418,9 @@ async function loginUser() {
     showApplication();
     await bootApplication();
   } catch (e) {
-    setAuthStatus('Přihlášení se nepovedlo.', 'miss');
-    alert(`MISS: ${e.message}`);
+    const message = friendlyAuthError(e);
+    setAuthStatus(message, 'miss');
+    alert(message);
   }
 }
 
@@ -780,7 +786,7 @@ async function bootStatus() {
     el.textContent =
       `API: ${status.api}\n` +
       `DB: ${status.db}\n` +
-      `Faze: ${status.counts?.phases ?? '-'}\n` +
+      `Pracovní etapy: ${status.counts?.phases ?? '-'}\n` +
       `Mistnosti: ${status.counts?.rooms ?? '-'}\n` +
       `Stavební okruhy: ${status.counts?.products ?? '-'}`;
   } catch (e) {
@@ -2325,15 +2331,23 @@ async function loadReceipts() {
           <button class="ghost-btn" onclick="deleteReceipt(${receipt.id})">Smazat</button>
         </div>
 
-        <div id="preview-receipt-edit-${receipt.id}" style="display:${shouldOpenEditor ? 'block' : 'none'};">
-          <input id="receipt-title-${receipt.id}" value="${esc(receipt.title)}" placeholder="nazev"><br>
-          <input id="receipt-supplier-${receipt.id}" value="${esc(receipt.supplier)}" placeholder="dodavatel"><br>
-          <input id="receipt-number-${receipt.id}" value="${esc(receipt.document_number)}" placeholder="cislo dokladu"><br>
+        <div id="preview-receipt-edit-${receipt.id}" class="receipt-editor" style="display:${shouldOpenEditor ? 'block' : 'none'};">
+          <label>Název dokladu</label>
+          <input id="receipt-title-${receipt.id}" value="${esc(receipt.title)}" placeholder="např. faktura Alza"><br>
+          <label>Dodavatel</label>
+          <input id="receipt-supplier-${receipt.id}" value="${esc(receipt.supplier)}" placeholder="např. Alza.cz"><br>
+          <label>Číslo dokladu</label>
+          <input id="receipt-number-${receipt.id}" value="${esc(receipt.document_number)}" placeholder="číslo faktury / účtenky"><br>
+          <label>Datum nákupu / převzetí pro výpočet záruky</label>
           <input id="receipt-date-${receipt.id}" value="${esc(receipt.purchase_date)}" type="date"><br>
-          <input id="receipt-total-${receipt.id}" value="${esc(receipt.total_amount)}" type="number" step="0.01" placeholder="castka"><br>
-          <input id="receipt-warranty-months-${receipt.id}" value="${esc(receipt.warranty_months)}" type="number" placeholder="zaruka mesicu"><br>
+          <label>Částka</label>
+          <input id="receipt-total-${receipt.id}" value="${esc(receipt.total_amount)}" type="number" step="0.01" placeholder="částka"><br>
+          <label>Délka záruky v měsících</label>
+          <input id="receipt-warranty-months-${receipt.id}" value="${esc(receipt.warranty_months)}" type="number" placeholder="např. 24"><br>
+          <label>Záruka do</label>
           <input id="receipt-warranty-until-${receipt.id}" value="${esc(receipt.warranty_until)}" type="date"><br>
-          <input id="receipt-warranty-note-${receipt.id}" value="${esc(receipt.warranty_note)}" placeholder="poznamka k zaruce"><br>
+          <label>Poznámka k záruce</label>
+          <input id="receipt-warranty-note-${receipt.id}" value="${esc(receipt.warranty_note)}" placeholder="např. prodloužená záruka"><br>
           <button onclick="saveReceipt(${receipt.id})">Ulozit</button>
         </div>
 

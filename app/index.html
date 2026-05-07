@@ -21,6 +21,7 @@
       <div id="authSetupPanel" hidden>
         <h2>První spuštění</h2>
         <p class="muted">Vytvoř hlavního uživatele. PIN bude sloužit pro rychlé přihlášení.</p>
+        <button type="button" class="ghost-btn auth-back-action" onclick="showAuthMode('login')">← Zpět na přihlášení</button>
         <label for="authName">Jméno</label>
         <input id="authName" autocomplete="name" placeholder="Jméno uživatele">
         <label for="authSetupUsername">Uživatelské jméno</label>
@@ -56,8 +57,7 @@
         </div>
       </div>
       <nav class="main-nav">
-        <button type="button" class="nav-link active" data-section="overviewSection">Přehled</button>
-        <button type="button" class="nav-link" data-section="productsSection">Stavební okruhy</button>
+        <button type="button" class="nav-link active" data-section="productsSection">Stavební okruhy</button>
         <button type="button" class="nav-link" data-section="documentsSection">Dokumenty</button>
         <button type="button" class="nav-link" data-section="receiptsSection">Faktury</button>
         <button type="button" class="nav-link" data-section="mediaSection">Média</button>
@@ -76,48 +76,32 @@
           <h2>RD Lounín</h2>
         </div>
         <div class="top-actions">
+          <button type="button" class="ghost-btn" onclick="toggleHeaderOverview()">Stav</button>
           <button type="button" class="ghost-btn" id="userButton" onclick="openUserPanel()">Uživatel</button>
           <button type="button" class="ghost-btn" onclick="logoutUser()">Odhlásit</button>
-          <button type="button" class="icon-btn" id="layoutToggle" title="Přepnout hustotu zobrazení" aria-label="Přepnout hustotu zobrazení">PC</button>
           <button type="button" class="theme-toggle" id="themeToggle" aria-label="Přepnout světlé/tmavé téma" aria-pressed="false">
             <span></span>
           </button>
         </div>
+        <div id="headerOverviewPanel" class="header-overview-panel" hidden>
+          <div class="metric-card">
+            <h3>API stav</h3>
+            <pre id="apiStatus">Načítám...</pre>
+          </div>
+          <div class="metric-card selected-product-card">
+            <h3>Vybraný stavební okruh</h3>
+            <div id="selectedProductSummary" class="muted">Vyber stavební okruh.</div>
+            <div id="selectedProductGuide" class="muted">Zařazení: -</div>
+            <div id="selectedProductHealth" class="muted">Stav okruhu: -</div>
+            <div id="selectedProductIssues" class="muted">K řešení: -</div>
+            <div id="selectedProductNext" class="muted">Další krok: -</div>
+            <div id="selectedProductCompletion" class="muted">Hotovost: -</div>
+            <div id="selectedProductChecklist" class="muted">Checklist: -</div>
+          </div>
+        </div>
       </header>
 
       <main>
-        <section id="overviewSection" class="panel hero-panel">
-          <div>
-            <p class="eyebrow">Přehled</p>
-            <h2>Stav aplikace a vybraný produkt</h2>
-          </div>
-          <div class="overview-grid">
-            <div class="metric-card">
-              <h3>API stav</h3>
-              <pre id="apiStatus">Načítám...</pre>
-            </div>
-            <div class="metric-card selected-product-card">
-              <h3>Vybraný produkt</h3>
-              <div id="selectedProductSummary" class="muted">Vyber stavební okruh.</div>
-              <div id="selectedProductGuide" class="muted">Zařazení: -</div>
-              <div id="selectedProductHealth" class="muted">Stav okruhu: -</div>
-              <div id="selectedProductIssues" class="muted">K řešení: -</div>
-              <div id="selectedProductNext" class="muted">Další krok: -</div>
-              <div id="selectedProductCompletion" class="muted">Hotovost: -</div>
-              <div id="selectedProductChecklist" class="muted">Checklist: -</div>
-            </div>
-          </div>
-          <div class="row-actions">
-            <button type="button" class="ghost-btn" onclick="openProductDocuments()">Dokumenty</button>
-            <button type="button" class="ghost-btn" onclick="openProductReceipts()">Faktury</button>
-            <button type="button" class="ghost-btn" onclick="openProductMedia()">Média</button>
-            <button type="button" class="ghost-btn" onclick="openProductDiary()">Deník</button>
-            <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('pending')">Faktury ke kontrole</button>
-            <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('review')">OCR review</button>
-            <button type="button" class="ghost-btn" onclick="focusWatchFolder()">Inbox</button>
-          </div>
-        </section>
-
         <section id="productsSection" class="panel">
           <div class="section-header">
             <div>
