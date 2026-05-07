@@ -635,6 +635,14 @@ Stage 2 – STRUKTURA
       - search
       - sort
       - last manual target
+    - local deferred triage queue:
+      - `Odlozene` filter
+      - per-document `Odlozit`
+      - per-document `Vratit do fronty`
+      - workbench count of deferred documents
+      - `Jen odlozene` view in workbench
+      - `Odlozit dalsi k reseni` fast action
+      - deferred document ids persist in browser local storage
 
 ---
 

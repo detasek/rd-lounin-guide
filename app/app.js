@@ -18,6 +18,8 @@ let lastWatchFolderCounts = { total: 0, image: 0, video: 0, file: 0 };
 let lastManualDocumentProductId = null;
 const PROJECT_DOCS_WORKBENCH = 'projektova dokumentace rd';
 const TRIAGE_PREFS_KEY = 'rd-lounin-triage-prefs-v1';
+const TRIAGE_DEFERRED_KEY = 'rd-lounin-triage-deferred-v1';
+let deferredDocumentIds = [];
 
 const STARTER_PRODUCTS_TOP8 = [
   { name: 'Zakladova deska', description: 'Konstrukcni celek: skladba, vykresy, kalkulace, fotky armovani a betonaze.' },
@@ -222,6 +224,42 @@ function restoreTriagePrefs() {
       }
     }
   } catch (_) {}
+}
+
+function saveDeferredDocumentIds() {
+  try {
+    window.localStorage.setItem(TRIAGE_DEFERRED_KEY, JSON.stringify(deferredDocumentIds));
+  } catch (_) {}
+}
+
+function restoreDeferredDocumentIds() {
+  try {
+    const raw = window.localStorage.getItem(TRIAGE_DEFERRED_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      deferredDocumentIds = parsed
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0);
+    }
+  } catch (_) {}
+}
+
+function isDeferredDocument(docId) {
+  return deferredDocumentIds.includes(Number(docId));
+}
+
+function deferDocumentId(docId) {
+  const id = Number(docId);
+  if (!Number.isFinite(id) || id <= 0 || isDeferredDocument(id)) return;
+  deferredDocumentIds = [...deferredDocumentIds, id];
+  saveDeferredDocumentIds();
+}
+
+function undeferDocumentId(docId) {
+  const id = Number(docId);
+  deferredDocumentIds = deferredDocumentIds.filter((value) => Number(value) !== id);
+  saveDeferredDocumentIds();
 }
 
 function scrollToSection(id) {
@@ -658,6 +696,18 @@ function setDocumentSort(value) {
   loadDocuments();
 }
 
+async function deferDocument(docId) {
+  deferDocumentId(docId);
+  await loadDocuments();
+  setDocumentStatus(`Dokument #${docId} odlozen.`, 'ok');
+}
+
+async function undeferDocument(docId) {
+  undeferDocumentId(docId);
+  await loadDocuments();
+  setDocumentStatus(`Dokument #${docId} vracen do fronty.`, 'ok');
+}
+
 async function focusProductDocuments(productId, filter = 'all') {
   selectedProductId = Number(productId);
   documentScope = 'selected';
@@ -675,7 +725,7 @@ async function focusProductDocuments(productId, filter = 'all') {
 }
 
 function updateDocumentFilterButtons() {
-  const ids = ['all', 'pdf', 'image', 'other', 'todo', 'suggested', 'unsorted'];
+  const ids = ['all', 'pdf', 'image', 'other', 'todo', 'suggested', 'unsorted', 'deferred'];
   ids.forEach((id) => {
     const btn = document.getElementById(`document-filter-${id}`);
     if (!btn) return;
@@ -843,6 +893,7 @@ function sortDocumentsForView(docs) {
 function getVisibleDocumentsForCurrentView(docs) {
   const docsWithSuggestion = docs.map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }));
   return sortDocumentsForView(docsWithSuggestion.filter((doc) => {
+    const isDeferred = isDeferredDocument(doc.id);
     if (documentSearch) {
       const haystack = [
         doc.name,
@@ -851,10 +902,20 @@ function getVisibleDocumentsForCurrentView(docs) {
       ].filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(documentSearch)) return false;
     }
+    if (documentFilter === 'deferred') return isDeferred;
     if (documentFilter === 'all') return true;
-    if (documentFilter === 'todo') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id)) || !doc._suggestion;
-    if (documentFilter === 'suggested') return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
-    if (documentFilter === 'unsorted') return !doc._suggestion;
+    if (documentFilter === 'todo') {
+      if (isDeferred) return false;
+      return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id)) || !doc._suggestion;
+    }
+    if (documentFilter === 'suggested') {
+      if (isDeferred) return false;
+      return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+    }
+    if (documentFilter === 'unsorted') {
+      if (isDeferred) return false;
+      return !doc._suggestion;
+    }
     return getDocumentKind(doc) === documentFilter;
   }));
 }
@@ -880,9 +941,10 @@ async function loadDocuments() {
     const key = `${doc.file_path || ''}::${doc.original_name || doc.name || ''}`;
     return (duplicateMap.get(key) || 0) > 1;
   }).length;
-  const unsortedCount = docsWithSuggestion.filter((doc) => !doc._suggestion).length;
-  const actionableSuggested = docsWithSuggestion.filter((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
-  const actionableUnsorted = docsWithSuggestion.filter((doc) => !doc._suggestion);
+  const deferredCount = docsWithSuggestion.filter((doc) => isDeferredDocument(doc.id)).length;
+  const unsortedCount = docsWithSuggestion.filter((doc) => !doc._suggestion && !isDeferredDocument(doc.id)).length;
+  const actionableSuggested = docsWithSuggestion.filter((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id) && !isDeferredDocument(doc.id));
+  const actionableUnsorted = docsWithSuggestion.filter((doc) => !doc._suggestion && !isDeferredDocument(doc.id));
   const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
   const currentBuckets = buildCurrentDocumentBuckets(docsWithSuggestion);
   const inWorkbench = scopedToSelected && isProjectDocsWorkbench(selectedProductName());
@@ -892,7 +954,7 @@ async function loadDocuments() {
 
   if (summaryEl) {
     summaryEl.textContent =
-      `Documents: ${docs.length} | viditelne: ${visibleDocs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | scope: ${documentScope} | filtr: ${documentFilter} | hledani: ${documentSearch || '-'} | razeni: ${documentSort}`;
+      `Documents: ${docs.length} | viditelne: ${visibleDocs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | odlozene: ${deferredCount} | scope: ${documentScope} | filtr: ${documentFilter} | hledani: ${documentSearch || '-'} | razeni: ${documentSort}`;
   }
 
   if (suggestionsEl) {
@@ -921,7 +983,7 @@ async function loadDocuments() {
     const currentTop = currentBuckets.slice(0, 5).map((bucket) => `${bucket.productName}: ${bucket.count}`).join(' | ');
     const targetTop = suggestionBuckets.slice(0, 5).map((bucket) => `${bucket.productName}: ${bucket.count}`).join(' | ');
     triageSummaryEl.textContent =
-      `Rozlozeni: ${currentTop || '-'} | cilove presuny: ${targetTop || '-'} | bez navrhu: ${unsortedCount}`;
+      `Rozlozeni: ${currentTop || '-'} | cilove presuny: ${targetTop || '-'} | bez navrhu: ${unsortedCount} | odlozene: ${deferredCount}`;
   }
 
   if (workbenchEl) {
@@ -935,13 +997,14 @@ async function loadDocuments() {
         <div class="card">
           <b>Workbench trideni</b>
           ${workbenchDone ? `<div class="muted" style="margin-top:6px;color:#0f766e;"><b>DONE: staging je dotrideny</b></div>` : ''}
-          <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporucene: ${actionableSuggested.length} | bez navrhu: ${actionableUnsorted.length} | hotovo: ${triageDone}/${docs.length} (${triagePct}%)</div>
+          <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporucene: ${actionableSuggested.length} | bez navrhu: ${actionableUnsorted.length} | odlozene: ${deferredCount} | hotovo: ${triageDone}/${docs.length} (${triagePct}%)</div>
           <div class="muted" style="margin-top:6px;">Posledni rucni cil: ${lastManualDocumentProductId ? esc(productsMap[lastManualDocumentProductId] || `produkt #${lastManualDocumentProductId}`) : 'zadny'}</div>
           <div class="row-actions" style="margin-top:8px;">
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('all')">Vse ve stagingu</button>
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('todo')">Jen k reseni</button>
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('suggested')">Jen doporucene</button>
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('unsorted')">Jen bez navrhu</button>
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('deferred')">Jen odlozene</button>
           </div>
           <div class="row-actions" style="margin-top:8px;">
             <button type="button" class="ghost-btn" onclick="openNextSuggestedDocument()">Otevrit dalsi doporuceny</button>
@@ -950,6 +1013,7 @@ async function loadDocuments() {
           <div class="row-actions" style="margin-top:8px;">
             <button type="button" class="ghost-btn" onclick="moveNextSuggestedDocument()">Presunout dalsi doporuceny</button>
             <button type="button" class="ghost-btn" onclick="moveNextUnsortedDocumentToLastTarget()">Zaradit dalsi bez navrhu do posledniho cile</button>
+            <button type="button" class="ghost-btn" onclick="deferNextActionableDocument()">Odlozit dalsi k reseni</button>
           </div>
         </div>
       `;
@@ -964,6 +1028,7 @@ async function loadDocuments() {
       documentFilter === 'todo' ? 'Zadne dokumenty k reseni.' :
       documentFilter === 'suggested' ? 'Zadne doporucene presuny.' :
       documentFilter === 'unsorted' ? 'Zadne dokumenty bez navrhu.' :
+      documentFilter === 'deferred' ? 'Zadne odlozene dokumenty.' :
       documentSearch ? 'Hledani nic nenaslo.' :
       'Zadne dokumenty.';
     el.innerHTML = `<div class="muted">${label}</div>`;
@@ -984,11 +1049,13 @@ async function loadDocuments() {
     const isDuplicate = (duplicateMap.get(duplicateKey) || 0) > 1;
     const suggestion = doc._suggestion;
     const currentProductName = productsMap[doc.product_id] || `produkt #${doc.product_id}`;
+    const isDeferred = isDeferredDocument(doc.id);
 
     el.innerHTML += `
       <div class="card">
         <img src="${qrUrl(doc.id)}" style="float:right;width:40px;height:40px;">
         <a href="#" onclick="openMediaViewer('${url}', '${esc(doc.mime_type || '')}');return false;"><b>${docIcon(doc)} ${esc(docName)}</b></a>
+        ${isDeferred ? `<div class="muted" style="color:#7c3aed;"><b>ODLOZENO</b></div>` : ''}
         ${inWorkbench && suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<div class="muted" style="color:#0f766e;"><b>TRIAGE: doporuceny presun</b></div>` : ''}
         ${inWorkbench && !suggestion ? `<div class="muted" style="color:#b45309;"><b>TRIAGE: rucni zarazeni</b></div>` : ''}
         ${isDuplicate ? `<div class="muted" style="color:#b45309;">Mozna duplicita</div>` : ''}
@@ -1011,6 +1078,7 @@ async function loadDocuments() {
           <button class="ghost-btn" onclick='copyText(${JSON.stringify(docName)}, "Nazev zkopirovan.")'>Kopirovat nazev</button>
           <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopirovana.")'>Kopirovat cestu</button>
           ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<button class="ghost-btn" onclick="openSuggestedProduct(${suggestion.productId}, ${JSON.stringify(suggestion.productName)})">Otevrit doporuceny produkt</button>` : ''}
+          ${isDeferred ? `<button class="ghost-btn" onclick="undeferDocument(${doc.id})">Vratit do fronty</button>` : `<button class="ghost-btn" onclick="deferDocument(${doc.id})">Odlozit</button>`}
           <button class="ghost-btn" onclick="deleteDocument(${doc.id})">Smazat</button>
         </div>
         <div style="display:${shouldOpenEditor ? 'block' : 'none'};margin-bottom:8px;">
@@ -1120,10 +1188,11 @@ async function copyVisibleDocumentsList() {
   const lines = visibleDocs.map((doc, index) => {
     const suggestion = doc._suggestion;
     const current = productsMap[doc.product_id] || `produkt #${doc.product_id}`;
+    const deferredTag = isDeferredDocument(doc.id) ? ' [ODLOZENO]' : '';
     const target = suggestion && Number(suggestion.productId) !== Number(doc.product_id)
       ? ` -> ${suggestion.productName}`
       : '';
-    return `${index + 1}. ${doc.name || doc.original_name || 'dokument'} | ${current}${target} | ${doc.file_path || ''}`;
+    return `${index + 1}. ${doc.name || doc.original_name || 'dokument'}${deferredTag} | ${current}${target} | ${doc.file_path || ''}`;
   });
 
   await copyText(lines.join('\n'), `Zkopirovano ${visibleDocs.length} dokumentu.`);
@@ -1344,6 +1413,25 @@ async function moveNextUnsortedDocumentToLastTarget() {
   await loadSelectedProductSummary();
   setDocumentStatus(`Dokument #${candidate.id} zarazen do ${(result?.document && productsMap[result.document.product_id]) || 'posledniho cile'}.`, 'ok');
   await continueWorkbenchQueue('unsorted');
+}
+
+async function deferNextActionableDocument() {
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const candidate = docs
+    .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
+    .find((doc) => !isDeferredDocument(doc.id) && (!!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id)) || !doc._suggestion));
+
+  if (!candidate) {
+    setDocumentStatus('Zadny dalsi dokument k odlozeni.', 'ok');
+    return;
+  }
+
+  deferDocumentId(candidate.id);
+  await loadDocuments();
+  setDocumentStatus(`Dokument #${candidate.id} odlozen.`, 'ok');
+  await continueWorkbenchQueue();
 }
 
 async function continueWorkbenchQueue(prefer = null) {
@@ -2420,6 +2508,7 @@ async function addDiaryEntry() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   restoreTriagePrefs();
+  restoreDeferredDocumentIds();
   document.getElementById('productForm').addEventListener('submit', createProduct);
   document.getElementById('documentForm').addEventListener('submit', uploadDocument);
   document.getElementById('photoForm').addEventListener('submit', uploadPhoto);
