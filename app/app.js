@@ -46,7 +46,11 @@ const TRIAGE_PREFS_KEY = 'rd-lounin-triage-prefs-v1';
 const TRIAGE_DEFERRED_KEY = 'rd-lounin-triage-deferred-v1';
 const THEME_KEY = 'rd-lounin-theme-v1';
 const LAYOUT_KEY = 'rd-lounin-layout-v1';
+const AUTH_TOKEN_KEY = 'rd-lounin-auth-token-v1';
 let deferredDocumentIds = [];
+let authToken = '';
+let currentUser = null;
+let appBootStarted = false;
 
 function closestAppSection(element) {
   return element ? element.closest('section[id]') : null;
@@ -254,16 +258,24 @@ async function parseJsonResponse(response, label) {
   return payload;
 }
 
+function authHeaders(extra = {}) {
+  const headers = { ...extra };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  return headers;
+}
+
 async function apiGet(path) {
-  const response = await fetch(apiUrl(path));
+  const response = await fetch(apiUrl(path), { headers: authHeaders() });
   return parseJsonResponse(response, `GET ${path}`);
 }
 
 async function apiPost(path, data) {
   const options = { method: 'POST' };
   if (data !== undefined) {
-    options.headers = { 'Content-Type': 'application/json' };
+    options.headers = authHeaders({ 'Content-Type': 'application/json' });
     options.body = JSON.stringify(data);
+  } else {
+    options.headers = authHeaders();
   }
   const response = await fetch(apiUrl(path), options);
   return parseJsonResponse(response, `POST ${path}`);
@@ -272,15 +284,147 @@ async function apiPost(path, data) {
 async function apiPut(path, data) {
   const response = await fetch(apiUrl(path), {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(data)
   });
   return parseJsonResponse(response, `PUT ${path}`);
 }
 
 async function apiDelete(path) {
-  const response = await fetch(apiUrl(path), { method: 'DELETE' });
+  const response = await fetch(apiUrl(path), { method: 'DELETE', headers: authHeaders() });
   return parseJsonResponse(response, `DELETE ${path}`);
+}
+
+function setAuthStatus(message, kind = '') {
+  const el = document.getElementById('authStatus');
+  if (!el) return;
+  el.className = `muted ${kind ? `status-${kind}` : ''}`.trim();
+  el.textContent = message || '';
+}
+
+function showAuthMode(mode) {
+  const authView = document.getElementById('authView');
+  const appShell = document.getElementById('appShell');
+  const setupPanel = document.getElementById('authSetupPanel');
+  const loginPanel = document.getElementById('authLoginPanel');
+  if (authView) authView.hidden = false;
+  if (appShell) appShell.hidden = true;
+  if (setupPanel) setupPanel.hidden = mode !== 'setup';
+  if (loginPanel) loginPanel.hidden = mode !== 'login';
+}
+
+function showApplication() {
+  const authView = document.getElementById('authView');
+  const appShell = document.getElementById('appShell');
+  if (authView) authView.hidden = true;
+  if (appShell) appShell.hidden = false;
+  const userButton = document.getElementById('userButton');
+  if (userButton && currentUser) userButton.textContent = currentUser.name || currentUser.username || 'Uživatel';
+}
+
+function persistAuth(token, user) {
+  authToken = token || '';
+  currentUser = user || null;
+  try {
+    if (authToken) window.localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+    else window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch (_) {}
+}
+
+async function initAuth() {
+  try {
+    authToken = window.localStorage.getItem(AUTH_TOKEN_KEY) || '';
+  } catch (_) {
+    authToken = '';
+  }
+
+  let bootstrap;
+  try {
+    bootstrap = await apiGet('/auth/bootstrap');
+  } catch (e) {
+    setAuthStatus(`MISS auth: ${e.message}`, 'miss');
+    showAuthMode('login');
+    return false;
+  }
+
+  if (bootstrap.needs_setup) {
+    setAuthStatus('Vytvoř prvního uživatele.', 'ok');
+    showAuthMode('setup');
+    return false;
+  }
+
+  if (authToken) {
+    try {
+      const me = await apiGet('/auth/me');
+      currentUser = me.user;
+      showApplication();
+      return true;
+    } catch (_) {
+      persistAuth('', null);
+    }
+  }
+
+  setAuthStatus('Přihlas se heslem nebo PINem.', '');
+  showAuthMode('login');
+  return false;
+}
+
+async function setupFirstUser() {
+  try {
+    const payload = await apiPost('/auth/setup', {
+      name: document.getElementById('authName').value.trim(),
+      username: document.getElementById('authSetupUsername').value.trim(),
+      password: document.getElementById('authSetupPassword').value,
+      pin: document.getElementById('authSetupPin').value
+    });
+    persistAuth(payload.token, payload.user);
+    showApplication();
+    await bootApplication();
+  } catch (e) {
+    setAuthStatus(`MISS: ${e.message}`, 'miss');
+    alert(`MISS: ${e.message}`);
+  }
+}
+
+async function loginUser() {
+  try {
+    const payload = await apiPost('/auth/login', {
+      username: document.getElementById('authLoginUsername').value.trim(),
+      password: document.getElementById('authLoginPassword').value,
+      pin: document.getElementById('authLoginPin').value
+    });
+    persistAuth(payload.token, payload.user);
+    showApplication();
+    await bootApplication();
+  } catch (e) {
+    setAuthStatus('Přihlášení se nepovedlo.', 'miss');
+    alert(`MISS: ${e.message}`);
+  }
+}
+
+async function logoutUser() {
+  try {
+    if (authToken) await apiPost('/auth/logout');
+  } catch (_) {}
+  persistAuth('', null);
+  showAuthMode('login');
+  setAuthStatus('Odhlášeno.', 'ok');
+}
+
+function openUserPanel() {
+  const panel = document.getElementById('userPanel');
+  const content = document.getElementById('userPanelContent');
+  if (content) {
+    content.innerHTML = currentUser
+      ? `<b>${esc(currentUser.name || '-')}</b><br><small>Uživatel: ${esc(currentUser.username || '-')} | ID: ${esc(currentUser.id)}</small><br><small>PIN a Face ID rozšíříme v další iteraci.</small>`
+      : 'Uživatel není načten.';
+  }
+  if (panel) panel.hidden = false;
+}
+
+function closeUserPanel() {
+  const panel = document.getElementById('userPanel');
+  if (panel) panel.hidden = true;
 }
 
 function selectedProductName() {
@@ -2476,6 +2620,110 @@ async function deleteWatchFolderMedia(filename) {
   }
 }
 
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function initDiaryFormDefaults() {
+  const dateEl = document.getElementById('diaryDate');
+  const personEl = document.getElementById('diaryInspectionPerson');
+  if (dateEl && !dateEl.value) dateEl.value = todayIsoDate();
+  if (personEl && !personEl.value) personEl.value = 'Ing. Hana Konvalinková';
+  toggleInspectionFields();
+}
+
+function toggleInspectionFields() {
+  const checked = Boolean(document.getElementById('diaryInspectionPresent')?.checked);
+  const fields = document.getElementById('diaryInspectionFields');
+  if (fields) fields.hidden = !checked;
+}
+
+function diaryWeatherLabel(value) {
+  return {
+    slunecno: 'Slunečno',
+    zatazeno: 'Zataženo',
+    dest: 'Déšť',
+    vetrno: 'Větrno'
+  }[value] || '-';
+}
+
+function inspectionClass(status) {
+  if (status === 'serious') return 'inspection-serious';
+  if (status === 'remarks' || status === 'verify') return 'inspection-remarks';
+  if (status === 'ok') return 'inspection-ok';
+  return '';
+}
+
+function nl2br(value) {
+  return esc(value).replace(/\n/g, '<br>');
+}
+
+async function prefillDiaryWeather() {
+  const date = document.getElementById('diaryDate')?.value || todayIsoDate();
+  const timeFrom = document.getElementById('diaryTimeFrom')?.value || '08:00';
+  const timeTo = document.getElementById('diaryTimeTo')?.value || '18:00';
+
+  try {
+    setDiaryStatus('Doplňuji počasí...', '');
+    const weather = await apiGet(`/diary/weather?date=${encodeURIComponent(date)}&time_from=${encodeURIComponent(timeFrom)}&time_to=${encodeURIComponent(timeTo)}`);
+    const weatherEl = document.getElementById('diaryWeatherSummary');
+    const tempEl = document.getElementById('diaryTemperatureAvg');
+    if (weatherEl) weatherEl.value = weather.weather_summary || '';
+    if (tempEl && weather.temperature_avg !== null && weather.temperature_avg !== undefined) tempEl.value = weather.temperature_avg;
+    setDiaryStatus(`Počasí doplněno: ${diaryWeatherLabel(weather.weather_summary)}, ${weather.temperature_avg ?? '-'} °C`, 'ok');
+  } catch (e) {
+    setDiaryStatus(`MISS počasí: ${e.message}`, 'miss');
+  }
+}
+
+async function loadDiaryCalendar() {
+  const el = document.getElementById('diaryCalendar');
+  if (!el) return;
+  const year = Number((document.getElementById('diaryDate')?.value || todayIsoDate()).slice(0, 4));
+  let days = [];
+  try {
+    days = await apiGet(`/diary/calendar?year=${year}`);
+  } catch (e) {
+    el.innerHTML = `<div class="muted status-miss">MISS kalendář: ${esc(e.message)}</div>`;
+    return;
+  }
+
+  const dayMap = new Map(days.map((day) => [day.date, day]));
+  const monthNames = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+  const holidaySet = new Set([
+    `${year}-01-01`, `${year}-05-01`, `${year}-05-08`, `${year}-07-05`, `${year}-07-06`,
+    `${year}-09-28`, `${year}-10-28`, `${year}-11-17`, `${year}-12-24`, `${year}-12-25`, `${year}-12-26`
+  ]);
+
+  const months = monthNames.map((name, monthIndex) => {
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const cells = Array.from({ length: daysInMonth }, (_, index) => {
+      const day = index + 1;
+      const date = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const weekday = new Date(`${date}T12:00:00`).getDay();
+      const isRed = weekday === 0 || weekday === 6 || holidaySet.has(date);
+      const state = dayMap.get(date);
+      return `
+        <button type="button" class="calendar-day ${isRed ? 'calendar-red' : ''}" title="${date}" onclick="focusDiaryDate('${date}')">
+          <span class="${state?.diary_count ? 'day-dot day-dot-left' : ''}"></span>
+          <span>${day}</span>
+          <span class="${state?.inspection_count ? `day-dot day-dot-right ${inspectionClass(state.inspection_status)}` : ''}"></span>
+        </button>
+      `;
+    }).join('');
+    return `<div class="month-card"><h3>${esc(name)} ${year}</h3><div class="month-grid">${cells}</div></div>`;
+  }).join('');
+
+  el.innerHTML = months;
+}
+
+function focusDiaryDate(date) {
+  const dateEl = document.getElementById('diaryDate');
+  if (dateEl) dateEl.value = date;
+  setDiaryFilter('all');
+  scrollToSection('diarySection');
+}
+
 async function loadDiarySelects() {
   const prodEl = document.getElementById('diaryProduct');
   const phaseEl = document.getElementById('diaryPhase');
@@ -2500,12 +2748,25 @@ async function loadDiarySelects() {
   });
 
   syncDiaryProductToSelection();
+  initDiaryFormDefaults();
 }
 
 function syncDiaryProductToSelection() {
   const prodEl = document.getElementById('diaryProduct');
   if (!prodEl) return;
   prodEl.value = selectedProductId ? String(selectedProductId) : '';
+}
+
+async function showDiaryLinks(id) {
+  try {
+    const detail = await apiGet(`/diary/${id}/links`);
+    const receipts = detail.suggested?.receipts || [];
+    const documents = detail.suggested?.documents || [];
+    const photos = detail.suggested?.photos || [];
+    alert(`Vazby k záznamu #${id}\nFaktury dle data: ${receipts.length}\nDokumenty dle data: ${documents.length}\nFotky dle data: ${photos.length}`);
+  } catch (e) {
+    alert(`MISS: ${e.message}`);
+  }
 }
 
 async function loadDiary() {
@@ -2530,12 +2791,13 @@ async function loadDiary() {
     return Number(entry.product_id) === Number(selectedProductId);
   });
   let lastDate = null;
-  setDiaryStatus(`Zaznamy: ${visibleData.length} / ${data.length} | filtr: ${diaryFilter}`, 'ok');
+  setDiaryStatus(`Záznamy: ${visibleData.length} / ${data.length} | filtr: ${diaryFilter}`, 'ok');
 
   if (!visibleData.length) {
     const label = diaryFilter === 'product' ? 'Zatím žádný záznam pro vybraný produkt.' : 'Zatím žádný záznam v deníku.';
     el.innerHTML = `<div class="card muted">${label}</div>`;
     updateDiaryFilterButtons();
+    await loadDiaryCalendar();
     return;
   }
 
@@ -2545,30 +2807,58 @@ async function loadDiary() {
       lastDate = entry.entry_date;
     }
 
+    const timeRange = entry.time_from || entry.time_to ? `${entry.time_from || '?'}-${entry.time_to || '?'}` : '-';
+    const weather = entry.weather_summary ? `${diaryWeatherLabel(entry.weather_summary)}${entry.temperature_avg !== null && entry.temperature_avg !== undefined ? `, ${entry.temperature_avg} °C` : ''}` : '-';
+    const inspectionStatus = entry.inspection_present ? (entry.inspection_summary || entry.inspection_status || '-') : '-';
+
     el.innerHTML += `
-      <div class="card">
-        <div><b>${esc(entry.entry_date)}</b></div>
-        ${esc(entry.content)}<br>
-        <small>Produkt: ${esc(productsMap[entry.product_id] || '-')} | Faze: ${esc(phasesMap[entry.phase_id] || '-')}</small>
+      <div class="card diary-entry-card ${inspectionClass(entry.inspection_status)}">
+        <div class="diary-entry-head">
+          <div>
+            <b>${esc(entry.entry_date)}</b>
+            <small>${esc(timeRange)} | ${esc(weather)}</small>
+          </div>
+          <div class="icon-actions">
+            <button type="button" class="icon-btn" title="Zobrazit vazby" onclick="showDiaryLinks(${entry.id})">◉</button>
+            <button type="button" class="icon-btn" title="Upravit">✎</button>
+          </div>
+        </div>
+        <div>${nl2br(entry.content)}</div>
+        <small>Produkt: ${esc(productsMap[entry.product_id] || '-')} | Fáze: ${esc(phasesMap[entry.phase_id] || '-')} | Dozor: ${esc(inspectionStatus)}</small>
       </div>
     `;
   });
 
   updateDiaryFilterButtons();
+  await loadDiaryCalendar();
 }
 
 async function addDiaryEntry() {
   const content = document.getElementById('diaryContent').value.trim();
-  if (!content) return alert('Napiš text');
+  const inspectionPresent = Boolean(document.getElementById('diaryInspectionPresent')?.checked);
+  if (!content && !inspectionPresent) return alert('Napiš text nebo vyplň kontrolu stavebního dozoru.');
 
   try {
     await apiPost('/diary', {
       content,
+      entry_date: document.getElementById('diaryDate').value || todayIsoDate(),
+      time_from: document.getElementById('diaryTimeFrom').value || null,
+      time_to: document.getElementById('diaryTimeTo').value || null,
+      weather_summary: document.getElementById('diaryWeatherSummary').value || null,
+      temperature_avg: document.getElementById('diaryTemperatureAvg').value || null,
+      weather_source: document.getElementById('diaryWeatherSummary').value ? 'manual_or_open_meteo' : null,
       product_id: document.getElementById('diaryProduct').value || null,
-      phase_id: document.getElementById('diaryPhase').value || null
+      phase_id: document.getElementById('diaryPhase').value || null,
+      inspection_present: inspectionPresent,
+      inspection_person: document.getElementById('diaryInspectionPerson').value || 'Ing. Hana Konvalinková',
+      inspection_status: document.getElementById('diaryInspectionStatus').value || 'ok',
+      inspection_notes: document.getElementById('diaryInspectionNotes').value || ''
     });
 
     document.getElementById('diaryContent').value = '';
+    document.getElementById('diaryInspectionNotes').value = '';
+    document.getElementById('diaryInspectionPresent').checked = false;
+    toggleInspectionFields();
     await loadDiarySelects();
     await loadDiary();
     await loadWarrantyDashboard();
@@ -2582,7 +2872,9 @@ async function addDiaryEntry() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function bootApplication() {
+  if (appBootStarted) return;
+  appBootStarted = true;
   initAppShell();
   restoreTriagePrefs();
   restoreDeferredDocumentIds();
@@ -2614,6 +2906,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (el) el.textContent = `MISS: ${error.message}`;
   });
   await runBootStep('vybraný produkt', loadSelectedProductSummary);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (await initAuth()) {
+    await bootApplication();
+  }
 });
 
 function openLightbox(url) {

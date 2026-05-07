@@ -57,6 +57,7 @@ function checkFrontendFiles() {
   if (!/<script\s+src="app\.js(?:\?[^"]*)?"><\/script>/.test(html)) fail('index.html must load app.js');
   if (!html.includes('Průvodce stavbou RD Lounín')) fail('index.html must keep Czech UTF-8 title');
   if (!html.includes('class="app-shell"')) fail('index.html must render the web app shell');
+  if (!html.includes('id="authView"')) fail('index.html must render the auth view');
   if (!html.includes('id="themeToggle"')) fail('index.html must expose the theme toggle');
 
   const config = read('app/config.js');
@@ -72,6 +73,7 @@ function checkFrontendFiles() {
     fail('app.js must derive file URLs through centralized helpers');
   }
   if (!appJs.includes('function initAppShell()')) fail('app.js must initialize the web app shell');
+  if (!appJs.includes('function initAuth()')) fail('app.js must initialize auth before app boot');
 
   const nginxConfig = read('app/nginx.conf');
   if (!nginxConfig.includes('proxy_pass http://backend:3000/api/')) fail('nginx.conf must proxy /api to backend');

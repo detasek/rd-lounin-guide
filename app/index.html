@@ -8,7 +8,44 @@
   <link rel="stylesheet" href="styles.css?v=dev">
 </head>
 <body>
-  <div class="app-shell">
+  <div id="authView" class="auth-view" aria-live="polite">
+    <div class="auth-card">
+      <div class="brand-block auth-brand">
+        <div class="brand-mark">RD</div>
+        <div>
+          <div class="eyebrow">RD Lounín</div>
+          <h1>Přihlášení do průvodce</h1>
+        </div>
+      </div>
+      <div id="authStatus" class="muted">Kontroluji přístup...</div>
+      <div id="authSetupPanel" hidden>
+        <h2>První spuštění</h2>
+        <p class="muted">Vytvoř hlavního uživatele. PIN bude sloužit pro rychlé přihlášení.</p>
+        <label for="authName">Jméno</label>
+        <input id="authName" autocomplete="name" placeholder="Jméno uživatele">
+        <label for="authSetupUsername">Uživatelské jméno</label>
+        <input id="authSetupUsername" autocomplete="username" placeholder="např. detasek">
+        <label for="authSetupPassword">Heslo</label>
+        <input id="authSetupPassword" type="password" autocomplete="new-password" placeholder="min. 6 znaků">
+        <label for="authSetupPin">PIN</label>
+        <input id="authSetupPin" type="password" inputmode="numeric" autocomplete="off" placeholder="volitelně">
+        <button type="button" onclick="setupFirstUser()">Vytvořit a přihlásit</button>
+      </div>
+      <div id="authLoginPanel" hidden>
+        <h2>Přihlášení</h2>
+        <label for="authLoginUsername">Uživatelské jméno</label>
+        <input id="authLoginUsername" autocomplete="username">
+        <label for="authLoginPassword">Heslo</label>
+        <input id="authLoginPassword" type="password" autocomplete="current-password">
+        <div class="auth-separator">nebo rychle přes PIN</div>
+        <label for="authLoginPin">PIN</label>
+        <input id="authLoginPin" type="password" inputmode="numeric" autocomplete="off">
+        <button type="button" onclick="loginUser()">Přihlásit</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="appShell" class="app-shell" hidden>
     <aside class="sidebar" aria-label="Hlavní navigace">
       <div class="brand-block">
         <div class="brand-mark">RD</div>
@@ -39,6 +76,8 @@
           <h2>RD Lounín</h2>
         </div>
         <div class="top-actions">
+          <button type="button" class="ghost-btn" id="userButton" onclick="openUserPanel()">Uživatel</button>
+          <button type="button" class="ghost-btn" onclick="logoutUser()">Odhlásit</button>
           <button type="button" class="icon-btn" id="layoutToggle" title="Přepnout hustotu zobrazení" aria-label="Přepnout hustotu zobrazení">PC</button>
           <button type="button" class="theme-toggle" id="themeToggle" aria-label="Přepnout světlé/tmavé téma" aria-pressed="false">
             <span></span>
@@ -241,13 +280,69 @@
             <button type="button" class="ghost-btn" id="diary-filter-product" onclick="setDiaryFilter('product')">Vybraný produkt</button>
           </div>
           <div id="diaryForm" class="form-panel">
-            <label>Produkt</label>
-            <select id="diaryProduct"></select>
-            <label>Fáze</label>
-            <select id="diaryPhase"></select>
+            <h3>Nový záznam</h3>
+            <div class="form-grid">
+              <div>
+                <label>Datum</label>
+                <input id="diaryDate" type="date">
+              </div>
+              <div>
+                <label>Od</label>
+                <input id="diaryTimeFrom" type="time" value="08:00">
+              </div>
+              <div>
+                <label>Do</label>
+                <input id="diaryTimeTo" type="time" value="18:00">
+              </div>
+              <div>
+                <label>Počasí</label>
+                <select id="diaryWeatherSummary">
+                  <option value="">Doplnit z API</option>
+                  <option value="slunecno">Slunečno</option>
+                  <option value="zatazeno">Zataženo</option>
+                  <option value="dest">Déšť</option>
+                  <option value="vetrno">Větrno</option>
+                </select>
+              </div>
+              <div>
+                <label>Průměrná teplota °C</label>
+                <input id="diaryTemperatureAvg" type="number" step="0.1" placeholder="auto">
+              </div>
+              <div>
+                <label>Produkt</label>
+                <select id="diaryProduct"></select>
+              </div>
+              <div>
+                <label>Fáze</label>
+                <select id="diaryPhase"></select>
+              </div>
+            </div>
+            <div class="row-actions">
+              <button type="button" class="ghost-btn" onclick="prefillDiaryWeather()">Doplnit počasí</button>
+            </div>
             <textarea id="diaryContent" placeholder="Co se dnes dělalo..."></textarea>
-            <button type="button" onclick="addDiaryEntry()">Uložit</button>
+            <div class="inspection-box">
+              <label class="checkbox-label">
+                <input id="diaryInspectionPresent" type="checkbox" onchange="toggleInspectionFields()">
+                Kontrola stavebního dozoru
+              </label>
+              <div id="diaryInspectionFields" hidden>
+                <label>Stavební dozor</label>
+                <input id="diaryInspectionPerson" value="Ing. Hana Konvalinková">
+                <label>Výsledek kontroly</label>
+                <select id="diaryInspectionStatus">
+                  <option value="ok">Bez závad</option>
+                  <option value="remarks">S připomínkami</option>
+                  <option value="verify">Čeká na ověření</option>
+                  <option value="serious">Vážná závada</option>
+                </select>
+                <label>Připomínky stavebního dozoru</label>
+                <textarea id="diaryInspectionNotes" placeholder="Každou připomínku napiš na samostatný řádek."></textarea>
+              </div>
+            </div>
+            <button type="button" onclick="addDiaryEntry()">Uložit záznam</button>
           </div>
+          <div id="diaryCalendar" class="calendar-panel"></div>
           <div id="diaryList"></div>
         </section>
 
@@ -279,6 +374,19 @@
     <button id="lightboxClose" type="button" class="ghost-btn lightbox-close">Zavřít</button>
     <img id="lightboxImg" alt="Náhled média">
     <video id="lightboxVideo" controls></video>
+  </div>
+
+  <div id="userPanel" class="modal-panel" hidden>
+    <div class="modal-card">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Uživatel</p>
+          <h2>Nastavení účtu</h2>
+        </div>
+        <button type="button" class="ghost-btn" onclick="closeUserPanel()">Zavřít</button>
+      </div>
+      <div id="userPanelContent" class="card muted">Načítám uživatele...</div>
+    </div>
   </div>
 
   <script src="config.js?v=dev"></script>

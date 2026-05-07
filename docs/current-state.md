@@ -908,3 +908,58 @@ Deploy poznamka:
 - API zustava same-origin pres `/api`.
 - Cloudflare ma smerovat na frontend `http://SYNOLOGY_IP:8091`.
 - Po nasazeni je stale nutny `docker compose up -d --force-recreate frontend backend`.
+
+---
+
+## AUTH + DIARY C.1 CHECKPOINT (2026-05-07)
+
+Rozpracovany lokalni balik po produkcnim nasazeni `94ad239`:
+- Produkce na Synology zustava stabilni a uzivatel ji muze testovat.
+- Dalsi vyvoj probiha lokalne v `C:\Users\detas\Documents\rd-lounin-guide`.
+- NAS deploy se ma delat az najednou z noveho deploy ZIPu bez slozky `data/`.
+
+Pridano v backendu:
+- `api/routes/auth.js`
+  - prvni setup uzivatele
+  - login heslem nebo PINem
+  - PBKDF2 hash hesla/PINu bez externich balicku
+  - session tokeny v SQLite
+- `api/app.js`
+  - route mount `/api/auth`
+- `api/routes/diary.js`
+  - rozsireni tabulky `diary` pres kompatibilni `ALTER TABLE`
+  - datum zapisu
+  - cas od/do
+  - pocasi
+  - prumerna teplota
+  - stavebni dozor
+  - stav kontroly: ok / remarks / verify / serious
+  - tabulka `diary_entry_links`
+  - kalendarovy endpoint `/api/diary/calendar`
+  - soft vazby dle data pres `/api/diary/:id/links`
+  - Open-Meteo endpoint `/api/diary/weather`
+
+Pridano ve frontendu:
+- login/setup obrazovka pred vstupem do aplikace
+- tlacitko Uzivatel a Odhlasit v topbaru
+- rozsireny formular stavebniho deniku:
+  - datum
+  - od/do
+  - pocasi
+  - prumerna teplota
+  - produkt/faze
+  - kontrola stavebniho dozoru
+  - predvyplneno `Ing. Hana Konvalinková`
+- rocni kalendar s vikendy/svatky cervene a teckami pro denik/dozor
+
+Overeno lokalne:
+- syntax check:
+  - `api/routes/auth.js`
+  - `api/routes/diary.js`
+  - `api/app.js`
+  - `app/app.js`
+- UTF-8 kontrola `app/index.html` pro prihlaseni a jmeno stavebniho dozoru.
+
+Zname omezeni lokalniho testu:
+- Plny runtime test na Windows neprosel kvuli nativnimu `sqlite3` modulu z jineho Node/Linux prostredi (`not a valid Win32 application`).
+- Produkcni runtime zustava Docker/Linux na Synology, kde `sqlite3` bezelo uz predtim.
