@@ -7,3 +7,4 @@ desktop.ini
 .env
 
 api/node_modules/
+deploy/
