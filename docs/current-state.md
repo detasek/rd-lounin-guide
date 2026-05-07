@@ -694,3 +694,26 @@ Aktuální doporučené další kroky:
 1. watcher batch actions minimum
 2. OCR provider integration minimum
 3. stabilization review
+
+---
+
+## STAGE B - STABILIZATION REVIEW START (2026-05-07)
+
+Lokalni checkpoint:
+- Stage B zahajena po deferred triage workflow.
+- Frontend API host se odviji z aktualniho hostname (`app/config.js`), aby fungoval pri zmene site.
+- Proveden rychly endpoint pass: frontend volane hlavni API routy maji backend protikus.
+- Proveden DB schema pass proti lokalni `data/db.sqlite`.
+- Opraven media rename drift:
+  - `photos` schema nema `updated_at`
+  - `PUT /api/photos/:id` uz `updated_at` nepouziva
+- Syntax check pro aktivni JS soubory:
+  - `api/**/*.js` mimo `node_modules`
+  - `app/*.js`
+
+Nasadit po tomto checkpointu:
+- `api/routes/photos.js`
+- `app/config.js`
+- `app/app.js`
+- `app/index.html`
+- `docs/current-state.md`
