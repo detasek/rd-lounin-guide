@@ -2,11 +2,10 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
+const { DB_PATH, UPLOADS_DIR, WATCH_MEDIA_DIR } = require('../lib/runtimePaths');
 
 const router = express.Router();
-const db = new sqlite3.Database('/data/db.sqlite');
-
-const WATCH_MEDIA_DIR = '/data/watch-folder/media';
+const db = new sqlite3.Database(DB_PATH);
 const IMPORTABLE_EXTENSIONS = new Set([
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic',
   '.mp4', '.mov', '.m4v', '.webm', '.avi'
@@ -147,7 +146,7 @@ router.post('/media/import', async (req, res) => {
     return res.status(400).json({ error: 'unsupported_file_type' });
   }
 
-  const targetDir = `/data/uploads/product_${productId}`;
+  const targetDir = path.join(UPLOADS_DIR, `product_${productId}`);
   fs.mkdirSync(targetDir, { recursive: true });
 
   const targetName = `${Date.now()}_${safeName.replace(/\s+/g, '_')}`;
@@ -201,7 +200,7 @@ router.post('/media/import-all', async (req, res) => {
     return res.json({ success: true, imported: 0, ids: [] });
   }
 
-  const targetDir = `/data/uploads/product_${productId}`;
+  const targetDir = path.join(UPLOADS_DIR, `product_${productId}`);
   fs.mkdirSync(targetDir, { recursive: true });
 
   const imported = [];

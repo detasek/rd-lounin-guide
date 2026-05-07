@@ -1,8 +1,8 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
+const { DB_PATH } = require('../lib/runtimePaths');
 
 const router = express.Router();
-const DB_PATH = '/data/db.sqlite';
 
 function openDb() {
   return new sqlite3.Database(DB_PATH);

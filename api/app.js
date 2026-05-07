@@ -12,6 +12,7 @@ const logger = require('./middleware/logger');
 const response = require('./middleware/response');
 const security = require('./middleware/security');
 const errorHandler = require('./middleware/errorHandler');
+const { UPLOADS_DIR, RECEIPTS_DIR } = require('./lib/runtimePaths');
 
 const app = express();
 app.disable('x-powered-by');
@@ -32,8 +33,8 @@ const staticOptions = {
   }
 };
 
-app.use('/files/receipts', express.static('/data/receipts', staticOptions));
-app.use('/files', express.static('/data/uploads', staticOptions));
+app.use('/files/receipts', express.static(RECEIPTS_DIR, staticOptions));
+app.use('/files', express.static(UPLOADS_DIR, staticOptions));
 
 // ----- ROUTES -----
 app.use('/api', require('./routes/status'));    // GET /api/status

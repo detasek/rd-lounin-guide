@@ -4,12 +4,13 @@ const sqlite3 = require('sqlite3').verbose();
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const { DB_PATH, UPLOADS_DIR, uploadPath } = require('../lib/runtimePaths');
 
-const db = new sqlite3.Database('/data/db.sqlite');
+const db = new sqlite3.Database(DB_PATH);
 const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
 
 const upload = multer({
-  dest: '/data/uploads/tmp',
+  dest: path.join(UPLOADS_DIR, 'tmp'),
   limits: { fileSize: MAX_UPLOAD_BYTES, files: 500 }
 });
 
@@ -63,7 +64,7 @@ router.post('/upload', upload.any(), (req, res) => {
       return res.status(productErr.message === 'invalid product_id' ? 400 : 500).json({ error: productErr.message });
     }
 
-    const dir = `/data/uploads/product_${product_id}`;
+    const dir = path.join(UPLOADS_DIR, `product_${product_id}`);
     fs.mkdirSync(dir, { recursive: true });
 
     const inserted = [];
@@ -77,7 +78,7 @@ router.post('/upload', upload.any(), (req, res) => {
 
       fs.renameSync(file.path, newPath);
 
-      const file_path = newPath.replace('/data/uploads', '');
+      const file_path = newPath.replace(UPLOADS_DIR, '').replace(/\\/g, '/');
       const displayName = files.length === 1 && customName ? customName : originalName;
 
       db.run(
@@ -163,7 +164,7 @@ router.delete('/:id', (req, res) => {
   db.get(`SELECT * FROM documents WHERE id = ?`, [req.params.id], (err, row) => {
     if (!row) return res.json({ deleted: 0 });
 
-    const fullPath = '/data/uploads' + row.file_path;
+    const fullPath = uploadPath(row.file_path);
 
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);

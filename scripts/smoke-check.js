@@ -84,8 +84,8 @@ function checkDriftSignals() {
   }
 
   const documentsRoute = read('api/routes/documents.js');
-  if (!documentsRoute.includes("'/data/uploads' + row.file_path")) {
-    fail('documents delete must remove files from /data/uploads + file_path');
+  if (!documentsRoute.includes('uploadPath(row.file_path)')) {
+    fail('documents delete must remove files through uploadPath(row.file_path)');
   }
 }
 

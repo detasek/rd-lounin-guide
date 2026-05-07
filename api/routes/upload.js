@@ -3,9 +3,10 @@ const router = express.Router();
 const multer = require('multer');
 const fs = require('fs');
 const receiptsController = require('../controllers/receiptsController');
+const { RECEIPTS_DIR } = require('../lib/runtimePaths');
 const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
 
-const uploadDir = '/data/receipts';
+const uploadDir = RECEIPTS_DIR;
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({

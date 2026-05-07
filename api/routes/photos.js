@@ -4,8 +4,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
+const { DB_PATH, UPLOADS_DIR, uploadPath } = require('../lib/runtimePaths');
 
-const db = new sqlite3.Database('/data/db.sqlite');
+const db = new sqlite3.Database(DB_PATH);
 const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
 
 function deriveMediaKind(mimeType) {
@@ -36,7 +37,7 @@ function productExists(productId) {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const productId = req.body.product_id;
-    const dir = `/data/uploads/product_${productId}`;
+    const dir = path.join(UPLOADS_DIR, `product_${productId}`);
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -155,7 +156,7 @@ router.delete('/:id', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Not found' });
 
-    const fullPath = '/data/uploads' + row.file_path;
+    const fullPath = uploadPath(row.file_path);
 
     db.run('DELETE FROM photos WHERE id = ?', [id], function (err) {
       if (err) return res.status(500).json({ error: err.message });

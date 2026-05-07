@@ -2,6 +2,7 @@ const db = require('../db/db');
 const { calcWarranty } = require('../services/warrantyService');
 const { extractCandidates } = require('../services/ocrReceiptService');
 const fs = require('fs');
+const { dataPath } = require('../lib/runtimePaths');
 
 function normalizeProductId(value) {
   if (value === undefined || value === null || value === '') return null;
@@ -219,7 +220,7 @@ exports.remove = (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Not found' });
 
-    const fullPath = '/data' + row.file_path;
+    const fullPath = dataPath(row.file_path);
 
     db.run('DELETE FROM receipts WHERE id = ?', [req.params.id], function (delErr) {
       if (delErr) return res.status(500).json({ error: delErr.message });
