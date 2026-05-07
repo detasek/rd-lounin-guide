@@ -260,24 +260,23 @@
             </div>
             <div id="diaryStatus" class="muted" aria-live="polite"></div>
           </div>
-          <div class="row-actions">
-            <button type="button" class="ghost-btn" id="diary-filter-all" onclick="setDiaryFilter('all')">Vše</button>
-            <button type="button" class="ghost-btn" id="diary-filter-product" onclick="setDiaryFilter('product')">Vybraný produkt</button>
-          </div>
           <div id="diaryForm" class="form-panel">
             <h3>Nový záznam</h3>
-            <div class="form-grid">
+            <div class="form-grid diary-form-grid">
               <div>
                 <label>Datum</label>
                 <input id="diaryDate" type="date" onchange="setDiaryCalendarDate(this.value); scheduleDiaryWeatherAutoFill()">
+                <small class="field-help">Datum zápisu ve stavebním deníku.</small>
               </div>
               <div>
                 <label>Od</label>
                 <input id="diaryTimeFrom" type="time" value="08:00" onchange="scheduleDiaryWeatherAutoFill()">
+                <small class="field-help">Začátek práce pro denní záznam.</small>
               </div>
               <div>
                 <label>Do</label>
                 <input id="diaryTimeTo" type="time" value="18:00" onchange="scheduleDiaryWeatherAutoFill()">
+                <small class="field-help">Konec práce; počasí se počítá z intervalu.</small>
               </div>
               <div>
                 <label>Počasí</label>
@@ -288,24 +287,30 @@
                   <option value="dest">Déšť</option>
                   <option value="vetrno">Větrno</option>
                 </select>
+                <small class="field-help">Doplní se automaticky po zadání času, ručně jde upravit.</small>
               </div>
               <div>
                 <label>Průměrná teplota °C</label>
                 <input id="diaryTemperatureAvg" type="number" step="0.1" placeholder="auto">
+                <small class="field-help">Průměrná teplota za pracovní interval.</small>
               </div>
               <div>
                 <label>Stavební okruh</label>
                 <select id="diaryProduct"></select>
+                <small class="field-help">Část stavby, ke které zápis patří.</small>
               </div>
               <div>
                 <label>Fáze</label>
                 <select id="diaryPhase"></select>
+                <small class="field-help">Pracovní fáze nebo stav rozpracování.</small>
               </div>
             </div>
-            <div class="row-actions">
-              <button type="button" class="ghost-btn" onclick="prefillDiaryWeather()">Doplnit počasí</button>
-            </div>
             <textarea id="diaryContent" placeholder="Co se dnes dělalo..."></textarea>
+            <div class="diary-photo-drop">
+              <label>Fotky k zápisu</label>
+              <input id="diaryPhotos" type="file" multiple accept="image/*,video/*">
+              <small class="field-help">Fotky nebo videa se uloží k vybranému stavebnímu okruhu a propojí se se záznamem.</small>
+            </div>
             <div class="inspection-box">
               <label class="checkbox-label">
                 <input id="diaryInspectionPresent" type="checkbox" onchange="toggleInspectionFields()">

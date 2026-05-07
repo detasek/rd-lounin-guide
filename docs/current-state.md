@@ -1004,3 +1004,38 @@ Dalsi logicky navazujici blok:
   - doplnit technologie z projektu RD Lounin
   - pridat stitky pro dokumentaci a media
   - rozvinout modal faktur/dokumentu z deniku z poctu na plnohodnotny proklikavaci prehled
+
+---
+
+## UX GUIDE C.3 CHECKPOINT (2026-05-07)
+
+Lokální úklid podle připomínek z produkčního testování:
+- Přihlašovací stránka má čitelnější chyby:
+  - duplicitní login hlásí, že uživatel už existuje
+  - opakované první spuštění hlásí, že účet už je založený
+- Přehled aplikace zůstává schovaný v horním tlačítku `Stav`.
+- Přepínač hustoty/PC zobrazení není v UI.
+- Stavební okruhy jsou kompaktní rolovatelný seznam:
+  - výběr klikem na řádek
+  - akce jsou menší a méně rušivé
+- Dokumenty mají uklizenější karty:
+  - hlavní akce jsou oddělené od pomocných kopírovacích akcí
+  - pojmy `staging`, `workbench`, `doporučený přesun`, `ruční zařazení`, `odložené` mají tooltip nápovědu
+- Faktury / účtenky vysvětlují význam data:
+  - `Datum nákupu / převzetí` je datum pro výpočet záruky
+  - záruka se nepočítá z data nahrání
+  - OCR minimum je označené jako dočasný rychlý návrh
+- Stavební deník:
+  - odstraněny přepínače `Vše` / `Vybraný produkt`
+  - odstraněno ruční tlačítko `Doplnit počasí`
+  - datum, od/do, počasí, teplota, okruh a fáze mají popis
+  - fotky/videa k zápisu jsou viditelné přímo ve formuláři
+  - klik na den v kalendáři otevře detail záznamu, pokud pro den existuje
+  - klik na kartu záznamu otevře stejný detail
+- Tečky v kalendáři jsou posunuté blíž ke středu mezi číslem a hranou pole.
+
+Ověřeno lokálně:
+- `app/app.js` syntax check přes bundled Node
+- `api/routes/auth.js` syntax check
+- `api/app.js` syntax check
+- `scripts/smoke-check.js`

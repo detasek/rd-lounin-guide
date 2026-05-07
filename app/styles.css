@@ -386,6 +386,28 @@ textarea {
   gap: 10px;
 }
 
+.diary-form-grid {
+  grid-template-columns: minmax(130px, .8fr) minmax(90px, .55fr) minmax(90px, .55fr) minmax(150px, .9fr) minmax(120px, .65fr) minmax(190px, 1.15fr) minmax(150px, .9fr);
+  align-items: start;
+}
+
+.field-help {
+  display: block;
+  margin-top: -5px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.diary-photo-drop {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
 .checkbox-label {
   display: flex;
   align-items: center;
@@ -530,6 +552,160 @@ body.theme-dark .theme-toggle span {
   gap: 10px;
 }
 
+#productsList {
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.product-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 82%, var(--surface-2));
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+
+.product-row:hover,
+.product-row.selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 65%, var(--surface));
+}
+
+.product-row.selected {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.product-row-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.product-row-main span,
+.product-row-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-row-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.product-row-actions .ghost-btn {
+  min-height: 34px;
+  padding: 6px 9px;
+}
+
+.help-tip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-soft) 78%, var(--surface));
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.document-card {
+  display: grid;
+  gap: 10px;
+}
+
+.document-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 12px;
+  align-items: start;
+}
+
+.mini-qr {
+  width: 40px;
+  height: 40px;
+  justify-self: end;
+}
+
+.document-badges,
+.document-meta,
+.document-actions,
+.inline-tools,
+.document-quick-assign {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.document-meta,
+.document-path {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.document-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-quick-assign select {
+  width: min(340px, 100%);
+  margin-bottom: 0;
+}
+
+.document-actions .ghost-btn,
+.inline-tools .text-tool {
+  min-height: 34px;
+  padding: 6px 10px;
+}
+
+.inline-tools .text-tool {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.danger-action {
+  color: var(--danger);
+}
+
+.document-editor {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.document-preview iframe {
+  width: 100%;
+  height: 420px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.document-preview img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
 #documentsList,
 #receiptsList,
 #watcherList,
@@ -613,12 +789,12 @@ body.theme-dark .theme-toggle span {
 }
 
 .day-dot-left {
-  left: 22%;
+  left: 28%;
   background: var(--accent-2);
 }
 
 .day-dot-right {
-  right: 22%;
+  right: 28%;
 }
 
 .receipt-editor {
@@ -658,6 +834,10 @@ body.theme-dark .theme-toggle span {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
+}
+
+.diary-entry-card {
+  cursor: pointer;
 }
 
 .diary-entry-head small {
@@ -796,6 +976,10 @@ body.compact-mode .panel {
   .header-overview-panel {
     grid-template-columns: 1fr;
   }
+
+  .diary-form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -816,5 +1000,34 @@ body.compact-mode .panel {
 
   .row-actions > button {
     flex: 1 1 auto;
+  }
+
+  .product-row,
+  .document-title-row {
+    grid-template-columns: 1fr;
+  }
+
+  .product-row-actions,
+  .document-actions,
+  .document-quick-assign,
+  .inline-tools {
+    width: 100%;
+  }
+
+  .product-row-actions .ghost-btn,
+  .document-actions .ghost-btn {
+    flex: 1 1 auto;
+  }
+
+  .mini-qr {
+    justify-self: start;
+  }
+
+  .day-dot-left {
+    left: 22%;
+  }
+
+  .day-dot-right {
+    right: 22%;
   }
 }

@@ -317,6 +317,7 @@ function showAuthMode(mode) {
 function friendlyAuthError(error) {
   const message = String(error?.message || error || '');
   if (message.includes('username_exists')) return 'Uživatel s tímto loginem už existuje. Zvol jiné uživatelské jméno, nebo se přihlas.';
+  if (message.includes('setup_already_done')) return 'První účet už existuje. Přepni se zpět na přihlášení a použij svůj login, heslo nebo PIN.';
   if (message.includes('invalid_registration') || message.includes('invalid_setup')) return 'Vyplň jméno, uživatelské jméno a heslo alespoň 6 znaků.';
   if (message.includes('invalid_credentials')) return 'Nesedí uživatelské jméno, heslo nebo PIN.';
   if (message.includes('credentials_required')) return 'Vyplň uživatelské jméno a heslo, nebo PIN.';
@@ -837,17 +838,19 @@ async function loadProducts() {
     if (!selectedProductId) selectedProductId = product.id;
     const guide = getProductGuide(product.name);
     const isWorkbench = isProjectDocsWorkbench(product.name);
+    const selected = Number(selectedProductId) === Number(product.id);
 
     el.innerHTML += `
-      <div class="card">
-        <img src="${qrUrl(product.id)}" style="float:right;width:40px;height:40px;">
-        <b>${esc(product.name)}</b> (${product.id})${guide ? ` <span class="muted">#${guide.order} | ${esc(guide.group)}</span>` : ''}${isWorkbench ? ` <span class="muted" style="color:#0f766e;">staging/workbench</span>` : ''}<br>
-        ${esc(product.description || '')}<br>
-        ${isWorkbench ? `<div class="muted">Workbench: sem nahraj projektovou dokumentaci a odtud ji trid.</div>` : ''}
-        ${guide ? `<div class="muted">Nahrat: ${esc(guide.uploads)}</div>` : ''}
-        <div class="row-actions">
-          <button onclick="selectProduct(${product.id})">Vybrat</button>
-          <button class="ghost-btn" onclick="deleteProduct(${product.id})">Smazat</button>
+      <div class="product-row ${selected ? 'selected' : ''}" onclick="selectProduct(${product.id})">
+        <div class="product-row-main">
+          <b>${esc(product.name)}</b>
+          <small>${guide ? `#${guide.order} | ${esc(guide.group)}` : 'vlastní okruh'}${isWorkbench ? ` | ${helpTip('staging/workbench', 'Dočasný pracovní prostor pro nahranou projektovou dokumentaci. Odtud ji třídíš do správných stavebních okruhů.')}` : ''}</small>
+          <span>${esc(product.description || '')}</span>
+          ${guide ? `<span class="muted">Nahrát: ${esc(guide.uploads)}</span>` : ''}
+        </div>
+        <div class="product-row-actions">
+          <button type="button" class="ghost-btn" onclick="event.stopPropagation(); openDocumentsForProduct(${product.id});">Dokumenty</button>
+          <button type="button" class="ghost-btn icon-only" title="Smazat stavební okruh" onclick="event.stopPropagation(); deleteProduct(${product.id})">Smazat</button>
         </div>
       </div>
     `;
@@ -856,6 +859,11 @@ async function loadProducts() {
   updateReceiptToolbar([]);
   saveTriagePrefs();
   loadSelectedProductSummary();
+}
+
+function openDocumentsForProduct(productId) {
+  selectProduct(productId);
+  openProductDocuments();
 }
 
 async function deleteProduct(id) {
@@ -939,6 +947,10 @@ function docIcon(item) {
   if (mime.includes('pdf') || name.toLowerCase().endsWith('.pdf')) return '[PDF]';
   if (mime.includes('image')) return '[IMG]';
   return '[DOC]';
+}
+
+function helpTip(label, text) {
+  return `<span class="help-tip" title="${esc(text)}">${esc(label)}</span>`;
 }
 
 function getDocumentKind(doc) {
@@ -1328,19 +1340,19 @@ async function loadDocuments() {
 
   if (workbenchEl) {
     if (!inWorkbench) {
-      workbenchEl.textContent = 'Workbench: vyber staging produkt pro trideni projektove dokumentace.';
+      workbenchEl.innerHTML = `${helpTip('Workbench třídění', 'Pracovní panel pro hromadné roztřídění projektové dokumentace do stavebních okruhů.')}: vyber okruh Projektová dokumentace RD.`;
     } else {
       const triageDone = docs.length - actionableSuggested.length - actionableUnsorted.length;
       const triagePct = docs.length ? Math.round((triageDone / docs.length) * 100) : 100;
       const workbenchDone = actionableSuggested.length === 0 && actionableUnsorted.length === 0;
       workbenchEl.innerHTML = `
         <div class="card">
-          <b>Workbench trideni</b>
-          ${workbenchDone ? `<div class="muted" style="margin-top:6px;color:#0f766e;"><b>DONE: staging je dotrideny</b></div>` : ''}
+          <b>${helpTip('Workbench třídění', 'Pracovní panel pro hromadné roztřídění projektové dokumentace do stavebních okruhů.')}</b>
+          ${workbenchDone ? `<div class="muted" style="margin-top:6px;color:#0f766e;"><b>DONE: staging je dotříděný</b></div>` : ''}
           <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporučené: ${actionableSuggested.length} | bez návrhu: ${actionableUnsorted.length} | odložené: ${deferredCount} | hotovo: ${triageDone}/${docs.length} (${triagePct}%)</div>
           <div class="muted" style="margin-top:6px;">Posledni ruční cíl: ${lastManualDocumentProductId ? esc(productsMap[lastManualDocumentProductId] || `produkt #${lastManualDocumentProductId}`) : 'zadny'}</div>
           <div class="row-actions" style="margin-top:8px;">
-            <button type="button" class="ghost-btn" onclick="setDocumentFilter('all')">Vse ve stagingu</button>
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('all')">Vše ve stagingu</button>
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('todo')">Jen k řešení</button>
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('suggested')">Jen doporučené</button>
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('unsorted')">Jen bez návrhu</button>
@@ -1393,48 +1405,73 @@ async function loadDocuments() {
     const currentProductName = productsMap[doc.product_id] || `produkt #${doc.product_id}`;
     const isDeferred = isDeferredDocument(doc.id);
 
+    const suggestedMove = suggestion && Number(suggestion.productId) !== Number(doc.product_id);
+    const triageBadge = isDeferred
+      ? helpTip('Odložené', 'Dokument je dočasně mimo pracovní frontu. Kdykoli ho můžeš vrátit zpět.')
+      : inWorkbench && suggestedMove
+      ? helpTip('Doporučený přesun', 'Aplikace odhadla cílový stavební okruh podle názvu souboru a cesty.')
+      : inWorkbench && !suggestion
+      ? helpTip('Ruční zařazení', 'Aplikace nenašla jistý cíl. Vyber stavební okruh ručně.')
+      : '';
+
     el.innerHTML += `
-      <div class="card">
-        <img src="${qrUrl(doc.id)}" style="float:right;width:40px;height:40px;">
-        <a href="#" onclick="openMediaViewer('${url}', '${esc(doc.mime_type || '')}');return false;"><b>${docIcon(doc)} ${esc(docName)}</b></a>
-        ${isDeferred ? `<div class="muted" style="color:#7c3aed;"><b>ODLOZENO</b></div>` : ''}
-        ${inWorkbench && suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<div class="muted" style="color:#0f766e;"><b>TRIAGE: doporuceny presun</b></div>` : ''}
-        ${inWorkbench && !suggestion ? `<div class="muted" style="color:#b45309;"><b>TRIAGE: rucni zařazení</b></div>` : ''}
-        ${isDuplicate ? `<div class="muted" style="color:#b45309;">Mozna duplicita</div>` : ''}
-        <div class="muted">Aktualne: ${esc(currentProductName)}</div>
-        ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<div class="muted" style="color:#0f766e;">Doporuceno presunout do: ${esc(suggestion.productName)}</div>` : ''}
-        ${!suggestion ? `<div class="muted" style="color:#b45309;">Doporučení: žádné</div>` : ''}
-        <div class="muted">${esc(doc.mime_type || '-')} | Vytvoreno: ${esc(createdAt)}</div>
-        <div class="muted">Cesta: ${esc(absolutePath)}</div>
+      <div class="card document-card">
+        <div class="document-main">
+          <div class="document-title-row">
+            <a href="#" onclick="openMediaViewer('${url}', '${esc(doc.mime_type || '')}');return false;"><b>${docIcon(doc)} ${esc(docName)}</b></a>
+            <img src="${qrUrl(doc.id)}" class="mini-qr" alt="QR dokumentu">
+          </div>
+          <div class="document-badges">
+            ${triageBadge}
+            ${isDuplicate ? helpTip('Možná duplicita', 'Soubor vypadá podobně jako jiný už uložený dokument.') : ''}
+            ${suggestedMove ? helpTip('Cíl návrhu', `Doporučeno přesunout do okruhu ${suggestion.productName}.`) : ''}
+            ${!suggestion ? helpTip('Bez návrhu', 'Dokument zatím nemá automaticky rozpoznaný cílový okruh.') : ''}
+          </div>
+          <div class="document-meta">
+            <span>Aktuálně: ${esc(currentProductName)}</span>
+            ${suggestedMove ? `<span>Doporučeno: ${esc(suggestion.productName)}</span>` : ''}
+            <span>${esc(doc.mime_type || '-')}</span>
+            <span>Vytvořeno: ${esc(createdAt)}</span>
+          </div>
+          <div class="document-path">${esc(absolutePath)}</div>
+        </div>
+
         ${!suggestion ? `
-        <div class="row-actions" style="margin-top:8px;">
-          <select id="document-quick-product-${doc.id}">
+        <div class="document-quick-assign">
+          <select id="document-quick-product-${doc.id}" aria-label="Cílový stavební okruh">
             ${buildProductOptions(lastManualDocumentProductId || doc.product_id)}
           </select>
-          <button class="ghost-btn" onclick="moveDocumentToQuickProduct(${doc.id})">Rychle zaradit</button>
+          <button class="ghost-btn" onclick="moveDocumentToQuickProduct(${doc.id})">Zařadit</button>
         </div>
         ` : ''}
-        <div class="row-actions">
-          ${isPdf ? `<button class="ghost-btn" onclick="togglePreview(${doc.id})">Nahled</button>` : ''}
-          <button class="ghost-btn" onclick="toggleDocumentEditor(${doc.id})">Upravit nazev</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(docName)}, "Název zkopírován.")'>Kopírovat název</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopírována.")'>Kopírovat cestu</button>
-          ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<button class="ghost-btn" onclick="openSuggestedProduct(${suggestion.productId}, ${JSON.stringify(suggestion.productName)})">Otevrit doporuceny produkt</button>` : ''}
-          ${isDeferred ? `<button class="ghost-btn" onclick="undeferDocument(${doc.id})">Vratit do fronty</button>` : `<button class="ghost-btn" onclick="deferDocument(${doc.id})">Odlozit</button>`}
-          <button class="ghost-btn" onclick="deleteDocument(${doc.id})">Smazat</button>
+
+        <div class="document-actions">
+          ${isPdf || isImg ? `<button class="ghost-btn" onclick="togglePreview(${doc.id})">Náhled</button>` : ''}
+          <button class="ghost-btn" onclick="toggleDocumentEditor(${doc.id})">Upravit</button>
+          ${suggestedMove ? `<button class="ghost-btn" onclick="moveDocumentToSuggestedProduct(${doc.id}, ${suggestion.productId}, ${JSON.stringify(suggestion.productName)})">Přesunout</button>` : ''}
+          ${suggestedMove ? `<button class="ghost-btn" onclick="openSuggestedProduct(${suggestion.productId}, ${JSON.stringify(suggestion.productName)})">Otevřít cíl</button>` : ''}
+          ${isDeferred ? `<button class="ghost-btn" onclick="undeferDocument(${doc.id})">Vrátit</button>` : `<button class="ghost-btn" onclick="deferDocument(${doc.id})">Odložit</button>`}
+          <button class="ghost-btn danger-action" onclick="deleteDocument(${doc.id})">Smazat</button>
         </div>
-        <div style="display:${shouldOpenEditor ? 'block' : 'none'};margin-bottom:8px;">
-          <input id="document-name-${doc.id}" value="${esc(docName)}" placeholder="nazev dokumentu">
+        <div class="inline-tools">
+          <button class="text-tool" onclick='copyText(${JSON.stringify(docName)}, "Název zkopírován.")'>Kopírovat název</button>
+          <button class="text-tool" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopírována.")'>Kopírovat cestu</button>
+        </div>
+        <div class="document-editor" style="display:${shouldOpenEditor ? 'block' : 'none'};">
+          <label>Název dokumentu</label>
+          <input id="document-name-${doc.id}" value="${esc(docName)}" placeholder="název dokumentu">
+          <label>Cílový stavební okruh</label>
           <select id="document-product-${doc.id}">
             ${buildProductOptions(doc.product_id)}
           </select>
-          <button class="ghost-btn" onclick="saveDocumentName(${doc.id})">Ulozit nazev</button>
-          <button class="ghost-btn" onclick="moveDocumentToSelectedProduct(${doc.id})">Přesunout na vybraný produkt</button>
-          ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<button class="ghost-btn" onclick="moveDocumentToSuggestedProduct(${doc.id}, ${suggestion.productId}, ${JSON.stringify(suggestion.productName)})">Presunout na doporuceny</button>` : ''}
+          <div class="row-actions">
+            <button class="ghost-btn" onclick="saveDocumentName(${doc.id})">Uložit</button>
+            <button class="ghost-btn" onclick="moveDocumentToSelectedProduct(${doc.id})">Přesunout na vybraný okruh</button>
+          </div>
         </div>
-        <div id="preview-${doc.id}" style="display:none;">
-          ${isPdf ? `<iframe src="${url}" style="width:100%;height:400px;"></iframe>` : ''}
-          ${isImg ? `<img src="${url}" style="max-width:100%;">` : ''}
+        <div id="preview-${doc.id}" class="document-preview" style="display:none;">
+          ${isPdf ? `<iframe src="${url}"></iframe>` : ''}
+          ${isImg ? `<img src="${url}" alt="${esc(docName)}">` : ''}
         </div>
       </div>
     `;
@@ -2315,10 +2352,10 @@ async function loadReceipts() {
         <a href="#" onclick="openMediaViewer('${url}', '${esc(receipt.mime_type || '')}');return false;"><b>${docIcon(receipt)} ${esc(name)}</b></a>
         ${receipt.warranty_until ? `<span style="margin-left:10px;padding:2px 6px;border-radius:6px;background:${warranty.color};color:white;font-size:12px;">${warranty.label}</span>` : ''}
         <div class="muted">Dodavatel: ${esc(receipt.supplier || '-')} | Doklad: ${esc(receipt.document_number || '-')}</div>
-        <div class="muted">Datum: ${esc(receipt.purchase_date || '-')} | Castka: ${esc(receipt.total_amount || '-')}</div>
+        <div class="muted">Datum nákupu / převzetí: ${esc(receipt.purchase_date || '-')} | Částka: ${esc(receipt.total_amount || '-')}</div>
         <div class="muted">Status: ${esc(receipt.status || 'pending_review')} | OCR status: ${esc(receipt.ocr_status || 'not_processed')}</div>
         <div class="muted">Vytvoreno: ${esc(createdAt)} | Cesta: ${esc(absolutePath)}</div>
-        <div class="muted">Automaticky: typ receipt, source manual, záruka 24 měsíců, když je datum a nic nechybí.</div>
+        <div class="muted">Záruka se počítá z pole Datum nákupu / převzetí, ne z data nahrání. OCR minimum je zatím jen rychlý návrh z názvu souboru; cílově má OCR hledat datum nákupu, dodání nebo převzetí přímo v dokladu.</div>
         ${ocrSummary ? `<div class="muted">${esc(ocrSummary)}</div>` : ''}
         <div class="row-actions">
           ${isPdf ? `<button class="ghost-btn" onclick="togglePreview('receipt-${receipt.id}')">Nahled</button>` : ''}
@@ -2814,6 +2851,10 @@ function focusDiaryDate(date) {
   setDiaryFilter('all');
   scrollToSection('diarySection');
   scheduleDiaryWeatherAutoFill();
+  const entryForDate = lastDiaryEntries.find((entry) => entry.entry_date === date);
+  if (entryForDate) {
+    showDiaryLinks(entryForDate.id);
+  }
 }
 
 async function loadDiarySelects() {
@@ -2970,15 +3011,15 @@ async function loadDiary() {
     const inspectionStatus = entry.inspection_present ? (entry.inspection_summary || entry.inspection_status || '-') : '-';
 
     el.innerHTML += `
-      <div class="card diary-entry-card ${inspectionClass(entry.inspection_status)}">
+      <div class="card diary-entry-card ${inspectionClass(entry.inspection_status)}" onclick="showDiaryLinks(${entry.id})">
         <div class="diary-entry-head">
           <div>
             <b>${esc(entry.entry_date)}</b>
             <small>${esc(timeRange)} | ${esc(weather)}</small>
           </div>
           <div class="icon-actions">
-            <button type="button" class="icon-btn" title="Zobrazit vazby" onclick="showDiaryLinks(${entry.id})">◉</button>
-            <button type="button" class="icon-btn" title="Upravit">✎</button>
+            <button type="button" class="icon-btn" title="Zobrazit záznam" onclick="event.stopPropagation(); showDiaryLinks(${entry.id})">◉</button>
+            <button type="button" class="icon-btn" title="Upravit" onclick="event.stopPropagation()">✎</button>
           </div>
         </div>
         <div>${nl2br(entry.content)}</div>
