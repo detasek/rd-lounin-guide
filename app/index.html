@@ -56,13 +56,12 @@
       </div>
       <nav class="main-nav">
         <button type="button" class="nav-link active" data-section="overviewSection">Přehled</button>
-        <button type="button" class="nav-link" data-section="productsSection">Produkty</button>
+        <button type="button" class="nav-link" data-section="productsSection">Stavební okruhy</button>
         <button type="button" class="nav-link" data-section="documentsSection">Dokumenty</button>
         <button type="button" class="nav-link" data-section="receiptsSection">Faktury</button>
         <button type="button" class="nav-link" data-section="mediaSection">Média</button>
         <button type="button" class="nav-link" data-section="diarySection">Deník</button>
-        <button type="button" class="nav-link" data-section="watcherSection">Watcher</button>
-      </nav>
+              </nav>
       <div class="sidebar-footer">
         <span class="status-dot"></span>
         <span>Cloudflare Access</span>
@@ -98,9 +97,9 @@
             </div>
             <div class="metric-card selected-product-card">
               <h3>Vybraný produkt</h3>
-              <div id="selectedProductSummary" class="muted">Vyber produkt.</div>
+              <div id="selectedProductSummary" class="muted">Vyber stavební okruh.</div>
               <div id="selectedProductGuide" class="muted">Zařazení: -</div>
-              <div id="selectedProductHealth" class="muted">Stav produktu: -</div>
+              <div id="selectedProductHealth" class="muted">Stav okruhu: -</div>
               <div id="selectedProductIssues" class="muted">K řešení: -</div>
               <div id="selectedProductNext" class="muted">Další krok: -</div>
               <div id="selectedProductCompletion" class="muted">Hotovost: -</div>
@@ -121,8 +120,8 @@
         <section id="productsSection" class="panel">
           <div class="section-header">
             <div>
-              <p class="eyebrow">Produkty a stavební okruhy</p>
-              <h2>Produkty</h2>
+              <p class="eyebrow">Průvodce stavbou</p>
+              <h2>Stavební okruhy</h2>
             </div>
           </div>
           <div class="split-grid">
@@ -206,6 +205,7 @@
             <input id="documentFolder" type="file" multiple webkitdirectory directory>
             <button type="submit">Nahrát dokumenty</button>
           </form>
+          <div class="muted upload-help">Dokumentace se nahraje do aktuálně vybraného stavebního okruhu. Později ji můžeš přesunout v triage/workbench do jiného okruhu.</div>
         </section>
 
         <section id="receiptsSection" class="panel">
@@ -284,15 +284,15 @@
             <div class="form-grid">
               <div>
                 <label>Datum</label>
-                <input id="diaryDate" type="date">
+                <input id="diaryDate" type="date" onchange="setDiaryCalendarDate(this.value); scheduleDiaryWeatherAutoFill()">
               </div>
               <div>
                 <label>Od</label>
-                <input id="diaryTimeFrom" type="time" value="08:00">
+                <input id="diaryTimeFrom" type="time" value="08:00" onchange="scheduleDiaryWeatherAutoFill()">
               </div>
               <div>
                 <label>Do</label>
-                <input id="diaryTimeTo" type="time" value="18:00">
+                <input id="diaryTimeTo" type="time" value="18:00" onchange="scheduleDiaryWeatherAutoFill()">
               </div>
               <div>
                 <label>Počasí</label>
@@ -309,7 +309,7 @@
                 <input id="diaryTemperatureAvg" type="number" step="0.1" placeholder="auto">
               </div>
               <div>
-                <label>Produkt</label>
+                <label>Stavební okruh</label>
                 <select id="diaryProduct"></select>
               </div>
               <div>
@@ -346,12 +346,12 @@
           <div id="diaryList"></div>
         </section>
 
-        <section id="watcherSection" class="panel">
+        <footer id="watcherSection" class="app-footer watcher-footer">
           <div class="section-header">
             <div>
               <p class="eyebrow">Kontrola a upozornění</p>
-              <h2>Watcher</h2>
-              <div id="watcherSummary" class="muted">Načítám watcher...</div>
+              <h2>Hlídací panel</h2>
+              <div id="watcherSummary" class="muted">Hlídá chybějící údaje, končící záruky, OCR review a soubory čekající v inboxu.</div>
             </div>
           </div>
           <div class="row-actions">
@@ -365,7 +365,7 @@
             <div id="warrantyAlerts"></div>
             <div id="warrantyDashboard"></div>
           </div>
-        </section>
+        </footer>
       </main>
     </div>
   </div>
@@ -374,6 +374,19 @@
     <button id="lightboxClose" type="button" class="ghost-btn lightbox-close">Zavřít</button>
     <img id="lightboxImg" alt="Náhled média">
     <video id="lightboxVideo" controls></video>
+  </div>
+
+  <div id="diaryDetailPanel" class="modal-panel" hidden>
+    <div class="modal-card diary-detail-modal">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Stavební deník</p>
+          <h2 id="diaryDetailTitle">Záznam</h2>
+        </div>
+        <button type="button" class="ghost-btn" onclick="closeDiaryDetail()">Zavřít</button>
+      </div>
+      <div id="diaryDetailContent" class="card muted">Načítám záznam...</div>
+    </div>
   </div>
 
   <div id="userPanel" class="modal-panel" hidden>

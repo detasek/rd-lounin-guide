@@ -261,6 +261,31 @@ router.get('/diary/:id/links', (req, res) => {
   });
 });
 
+router.post('/diary/:id/links', (req, res) => {
+  const diaryId = Number(req.params.id);
+  const body = req.body || {};
+  const entityType = String(body.entity_type || '').trim();
+  const entityId = Number(body.entity_id);
+  const linkReason = String(body.link_reason || 'manual').trim();
+  const allowedTypes = new Set(['receipt', 'document', 'photo', 'product']);
+
+  if (!Number.isInteger(diaryId) || !allowedTypes.has(entityType) || !Number.isInteger(entityId)) {
+    return res.status(400).json({ error: 'invalid_link' });
+  }
+
+  db.run(
+    `
+      INSERT OR IGNORE INTO diary_entry_links (diary_id, entity_type, entity_id, link_reason)
+      VALUES (?, ?, ?, ?)
+    `,
+    [diaryId, entityType, entityId, linkReason],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.status(201).json({ success: true, id: this.lastID || null });
+    }
+  );
+});
+
 router.post('/diary', (req, res) => {
   const body = req.body || {};
   const entryDate = safeDate(body.entry_date);
@@ -316,6 +341,20 @@ router.post('/diary', (req, res) => {
       });
     }
   );
+});
+
+router.delete('/diary/:id', (req, res) => {
+  const diaryId = Number(req.params.id);
+  if (!Number.isInteger(diaryId)) return res.status(400).json({ error: 'invalid_diary_id' });
+
+  db.serialize(() => {
+    db.run(`DELETE FROM diary_entry_links WHERE diary_id = ?`, [diaryId]);
+    db.run(`DELETE FROM diary WHERE id = ?`, [diaryId], function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!this.changes) return res.status(404).json({ error: 'diary_not_found' });
+      res.json({ success: true });
+    });
+  });
 });
 
 module.exports = router;

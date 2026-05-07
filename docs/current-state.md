@@ -963,3 +963,44 @@ Overeno lokalne:
 Zname omezeni lokalniho testu:
 - Plny runtime test na Windows neprosel kvuli nativnimu `sqlite3` modulu z jineho Node/Linux prostredi (`not a valid Win32 application`).
 - Produkcni runtime zustava Docker/Linux na Synology, kde `sqlite3` bezelo uz predtim.
+
+---
+
+## UX GUIDE C.2 CHECKPOINT (2026-05-07)
+
+Navazujici lokalni UX balik podle testovani produkcni verze:
+- Produkcni Synology verze zustava bez zasahu, deploy se bude delat az najednou.
+- Viditelny pojem `Produkt` se v UI posouva na `Stavebni okruh`.
+- Viditelny pojem `Faze` se v deniku posouva na `Pracovni etapa`.
+- Watcher je schovany z hlavni navigace a presunuty jako spodní `Hlidaci panel`.
+- Hlidaci panel ma popis:
+  - hlida chybejici udaje
+  - koncici zaruky
+  - OCR review
+  - soubory cekajici v inboxu
+- Stavebni denik:
+  - formular uz neni sticky na spodu viewportu
+  - pocasi se doplnuje automaticky po zmene data / casu od-do
+  - manualni tlacitko bylo nahrazeno informacnim textem
+  - denik ma detailni modal pro zobrazeni vazeb
+  - z detailu jde záznam smazat
+  - k denikovemu zapisu lze nahrat fotky/videa, ktere se nahraji do media a propoji pres `diary_entry_links`
+- Kalendar deniku:
+  - uz se nezobrazuje cely rok naraz
+  - je jeden vetsi mesicni kalendar
+  - obsahuje popisky dni Po-Ne
+  - umi prepnout predchozi/dalsi mesic
+  - zachovane tecky pro zapis a stav stavebniho dozoru
+- Faktury:
+  - pridane interaktivni vyhledavani podle nazvu, dodavatele, cisla dokladu, data a stavebniho okruhu
+- Dokumentace:
+  - upload texty sjednocene na nahrani souboru/slozky
+  - doplnena poznamka, ze dokumentace se uklada do aktualne vybraneho stavebniho okruhu a pak jde pres triage presunout
+
+Dalsi logicky navazujici blok:
+- prejmenovat DB/API model az pozdeji a opatrne, zatim zustava `product_id` jako kompatibilni interni nazev.
+- dodelat skutecny pruvodce po etapach z projektove dokumentace:
+  - pripravit obsah pro 8/16 stavebnich okruhu
+  - doplnit technologie z projektu RD Lounin
+  - pridat stitky pro dokumentaci a media
+  - rozvinout modal faktur/dokumentu z deniku z poctu na plnohodnotny proklikavaci prehled

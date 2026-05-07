@@ -29,6 +29,7 @@ let productsMap = {};
 let phasesMap = {};
 let selectedProductId = null;
 let receiptFilter = 'all';
+let receiptSearch = '';
 let mediaFilter = 'all';
 let documentFilter = 'all';
 let documentScope = 'selected';
@@ -51,6 +52,10 @@ let deferredDocumentIds = [];
 let authToken = '';
 let currentUser = null;
 let appBootStarted = false;
+let diaryWeatherTimer = null;
+let diaryCalendarYear = new Date().getFullYear();
+let diaryCalendarMonth = new Date().getMonth();
+let lastDiaryEntries = [];
 
 function closestAppSection(element) {
   return element ? element.closest('section[id]') : null;
@@ -560,9 +565,9 @@ async function loadSelectedProductSummary() {
   if (!el) return;
 
   if (!selectedProductId) {
-    el.textContent = 'Vyber produkt.';
+    el.textContent = 'Vyber stavební okruh.';
     if (guideEl) guideEl.textContent = 'Zarazeni: -';
-    if (healthEl) healthEl.textContent = 'Stav produktu: -';
+    if (healthEl) healthEl.textContent = 'Stav okruhu: -';
     if (issuesEl) issuesEl.textContent = 'K reseni: -';
     if (nextEl) nextEl.textContent = 'Další krok: -';
     if (completionEl) completionEl.textContent = 'Hotovost: -';
@@ -630,7 +635,7 @@ async function loadSelectedProductSummary() {
     const completionPct = Math.round((doneChecklist / checklist.length) * 100);
 
     let nextStep = 'Bez akutni akce.';
-    if (isWorkbench) nextStep = 'Tridit dokumentaci do cilovych produktu.';
+    if (isWorkbench) nextStep = 'Třídit dokumentaci do cílových okruhů.';
     else if (inboxCount > 0) nextStep = `Zpracuj inbox media (${inboxCount}).`;
     else if (reviewNeeded > 0) nextStep = `Zkontroluj OCR receipts (${reviewNeeded}).`;
     else if (missingDocumentNumber > 0) nextStep = `Dopln cislo dokladu u receipts (${missingDocumentNumber}).`;
@@ -638,25 +643,25 @@ async function loadSelectedProductSummary() {
     else if (missingPurchaseDate > 0) nextStep = `Dopln datum nakupu u receipts (${missingPurchaseDate}).`;
     else if (pendingReceipts > 0) nextStep = `Dokoncit pending receipts (${pendingReceipts}).`;
     else if (expiringSoon > 0) nextStep = `Zkontroluj záruky končící do 30 dní (${expiringSoon}).`;
-    else if (!documentList.length) nextStep = 'Pridat prvni dokument k produktu.';
+    else if (!documentList.length) nextStep = 'Pridat prvni dokument k okruhu.';
     else if (!photoList.length) nextStep = 'Pridat prvni foto nebo video.';
     else if (!diaryForProduct.length) nextStep = 'Pridat prvni zapis do deniku.';
 
     el.textContent =
-      `Produkt: ${currentProductName}${isWorkbench ? ' | staging/workbench' : ''} | dokumenty: ${documentList.length} (pdf ${pdfDocuments}, obrázky ${imageDocuments}, ostatní ${otherDocuments}) | receipts: ${receiptList.length} (ready ${readyReceipts}, pending ${pendingReceipts}) | media: ${photoList.length} (obrázky ${imageCount}, videa ${videoCount}) | diary: ${diaryForProduct.length} | diary filtr: ${diaryFilter}`;
+      `Okruh: ${currentProductName}${isWorkbench ? ' | staging/workbench' : ''} | dokumenty: ${documentList.length} (pdf ${pdfDocuments}, obrázky ${imageDocuments}, ostatní ${otherDocuments}) | receipts: ${receiptList.length} (ready ${readyReceipts}, pending ${pendingReceipts}) | media: ${photoList.length} (obrázky ${imageCount}, videa ${videoCount}) | diary: ${diaryForProduct.length} | diary filtr: ${diaryFilter}`;
 
     if (guideEl) {
       guideEl.textContent = isWorkbench
         ? 'Zarazeni: staging/workbench | nahrat: projektova dokumentace, rozpocty, vykresy, technicke podklady'
         : guide
         ? `Zarazeni: #${guide.order} | skupina: ${guide.group} | nahrat: ${guide.uploads}`
-        : 'Zarazeni: vlastni produkt bez sablony';
+        : 'Zařazení: vlastní stavební okruh bez šablony';
     }
 
     if (healthEl) {
       healthEl.textContent = isWorkbench
-        ? `Stav produktu: staging | problemu: ${criticalIssues}`
-        : `Stav produktu: ${productHealth} | problemu: ${criticalIssues}`;
+        ? `Stav okruhu: staging | problémů: ${criticalIssues}`
+        : `Stav okruhu: ${productHealth} | problémů: ${criticalIssues}`;
     }
 
     if (issuesEl) {
@@ -718,7 +723,7 @@ function updateReceiptToolbar(receipts = []) {
   const summaryEl = document.getElementById('receiptSummary');
 
   if (selectedEl) {
-    selectedEl.textContent = `Produkt: ${selectedProductName()}`;
+    selectedEl.textContent = `Okruh: ${selectedProductName()}`;
   }
 
   if (summaryEl) {
@@ -728,6 +733,11 @@ function updateReceiptToolbar(receipts = []) {
     summaryEl.textContent =
       `Receipts: ${receipts.length} | ready: ${readyCount} | pending: ${pendingCount} | review: ${reviewNeededCount} | filtr: ${receiptFilter}`;
   }
+}
+
+function setReceiptSearch(value) {
+  receiptSearch = String(value || '').trim().toLowerCase();
+  loadReceipts();
 }
 
 function setDiaryStatus(message, kind = '') {
@@ -761,7 +771,7 @@ async function bootStatus() {
       `DB: ${status.db}\n` +
       `Faze: ${status.counts?.phases ?? '-'}\n` +
       `Mistnosti: ${status.counts?.rooms ?? '-'}\n` +
-      `Produkty: ${status.counts?.products ?? '-'}`;
+      `Stavební okruhy: ${status.counts?.products ?? '-'}`;
   } catch (e) {
     el.textContent = `MISS: ${e.message}`;
   }
@@ -794,7 +804,7 @@ async function loadProducts() {
 
   if (!products.length) {
     selectedProductId = null;
-    el.innerHTML = '<div class="muted">Zatím žádné produkty.</div>';
+    el.innerHTML = '<div class="muted">Zatím žádné stavební okruhy.</div>';
     updateReceiptToolbar([]);
     loadWatchFolderMedia();
     loadSelectedProductSummary();
@@ -1765,7 +1775,7 @@ async function saveDocumentName(id) {
 
 async function moveDocumentToSelectedProduct(id) {
   if (!selectedProductId) {
-    setDocumentStatus('MISS: nejdriv vyber produkt', 'miss');
+    setDocumentStatus('MISS: nejdriv vyber stavebni okruh', 'miss');
     return;
   }
 
@@ -1849,7 +1859,7 @@ async function deleteDocument(id) {
 async function uploadDocument(e) {
   e.preventDefault();
 
-  if (!selectedProductId) return alert('Vyber produkt');
+  if (!selectedProductId) return alert('Vyber stavebn? okruh');
   const filesInput = document.getElementById('documentFile');
   const folderInput = document.getElementById('documentFolder');
   const customNameInput = document.getElementById('documentName');
@@ -1870,6 +1880,7 @@ async function uploadDocument(e) {
 
   const response = await fetch(apiUrl('/documents/upload'), {
     method: 'POST',
+    headers: authHeaders(),
     body: fd
   });
 
@@ -1942,6 +1953,20 @@ function filterWarranty(receipt) {
   if (receiptFilter === 'orange') return diff < 3 && diff >= 0;
   if (receiptFilter === 'red') return diff < 0;
   return true;
+}
+
+function filterReceiptSearch(receipt) {
+  if (!receiptSearch) return true;
+  const haystack = [
+    receipt.title,
+    receipt.original_name,
+    receipt.supplier,
+    receipt.document_number,
+    receipt.purchase_date,
+    receipt.date,
+    productsMap[receipt.product_id]
+  ].join(' ').toLowerCase();
+  return haystack.includes(receiptSearch);
 }
 
 async function loadWarrantyDashboard() {
@@ -2129,7 +2154,7 @@ async function focusReceiptFromWatcher(receiptId, productId) {
 
 async function focusSelectedReceiptIssue(mode) {
   if (!selectedProductId) {
-    setReceiptStatus('MISS: nejdriv vyber produkt', 'miss');
+    setReceiptStatus('MISS: nejdriv vyber stavebni okruh', 'miss');
     return;
   }
 
@@ -2244,7 +2269,7 @@ async function loadReceipts() {
 
   const path = selectedProductId ? `/receipts?product_id=${selectedProductId}` : '/receipts';
   const receipts = await apiGet(path);
-  const visibleReceipts = receipts.filter(filterWarranty);
+  const visibleReceipts = receipts.filter(filterWarranty).filter(filterReceiptSearch);
 
   el.innerHTML = '';
   updateReceiptToolbar(visibleReceipts);
@@ -2363,6 +2388,7 @@ async function uploadReceipt(e) {
   try {
     const response = await fetch(apiUrl('/receipts/upload'), {
       method: 'POST',
+      headers: authHeaders(),
       body: fd
     });
     await parseJsonResponse(response, 'POST /receipts/upload');
@@ -2507,7 +2533,7 @@ async function deletePhoto(id) {
 async function uploadPhoto(e) {
   e.preventDefault();
 
-  if (!selectedProductId) return alert('Vyber produkt');
+  if (!selectedProductId) return alert('Vyber stavebn? okruh');
   const file = document.getElementById('photoInput').files[0];
   if (!file) return alert('Vyber foto nebo video');
 
@@ -2517,6 +2543,7 @@ async function uploadPhoto(e) {
 
   const response = await fetch(apiUrl('/photos/upload'), {
     method: 'POST',
+    headers: authHeaders(),
     body: fd
   });
 
@@ -2628,6 +2655,7 @@ function initDiaryFormDefaults() {
   const dateEl = document.getElementById('diaryDate');
   const personEl = document.getElementById('diaryInspectionPerson');
   if (dateEl && !dateEl.value) dateEl.value = todayIsoDate();
+  if (dateEl?.value) setDiaryCalendarDate(dateEl.value, false);
   if (personEl && !personEl.value) personEl.value = 'Ing. Hana Konvalinková';
   toggleInspectionFields();
 }
@@ -2676,10 +2704,18 @@ async function prefillDiaryWeather() {
   }
 }
 
+function scheduleDiaryWeatherAutoFill() {
+  clearTimeout(diaryWeatherTimer);
+  diaryWeatherTimer = setTimeout(() => {
+    prefillDiaryWeather();
+  }, 450);
+}
+
 async function loadDiaryCalendar() {
   const el = document.getElementById('diaryCalendar');
   if (!el) return;
-  const year = Number((document.getElementById('diaryDate')?.value || todayIsoDate()).slice(0, 4));
+  const year = diaryCalendarYear;
+  const month = diaryCalendarMonth;
   let days = [];
   try {
     days = await apiGet(`/diary/calendar?year=${year}`);
@@ -2690,38 +2726,69 @@ async function loadDiaryCalendar() {
 
   const dayMap = new Map(days.map((day) => [day.date, day]));
   const monthNames = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+  const weekdayNames = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
   const holidaySet = new Set([
     `${year}-01-01`, `${year}-05-01`, `${year}-05-08`, `${year}-07-05`, `${year}-07-06`,
     `${year}-09-28`, `${year}-10-28`, `${year}-11-17`, `${year}-12-24`, `${year}-12-25`, `${year}-12-26`
   ]);
 
-  const months = monthNames.map((name, monthIndex) => {
-    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const cells = Array.from({ length: daysInMonth }, (_, index) => {
-      const day = index + 1;
-      const date = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const weekday = new Date(`${date}T12:00:00`).getDay();
-      const isRed = weekday === 0 || weekday === 6 || holidaySet.has(date);
-      const state = dayMap.get(date);
-      return `
-        <button type="button" class="calendar-day ${isRed ? 'calendar-red' : ''}" title="${date}" onclick="focusDiaryDate('${date}')">
-          <span class="${state?.diary_count ? 'day-dot day-dot-left' : ''}"></span>
-          <span>${day}</span>
-          <span class="${state?.inspection_count ? `day-dot day-dot-right ${inspectionClass(state.inspection_status)}` : ''}"></span>
-        </button>
-      `;
-    }).join('');
-    return `<div class="month-card"><h3>${esc(name)} ${year}</h3><div class="month-grid">${cells}</div></div>`;
+  const firstDay = new Date(year, month, 1);
+  const firstWeekday = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const blanks = Array.from({ length: firstWeekday }, () => '<span class="calendar-day calendar-blank"></span>').join('');
+  const cells = Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const weekday = new Date(`${date}T12:00:00`).getDay();
+    const isRed = weekday === 0 || weekday === 6 || holidaySet.has(date);
+    const state = dayMap.get(date);
+    return `
+      <button type="button" class="calendar-day ${isRed ? 'calendar-red' : ''}" title="${date}" onclick="focusDiaryDate('${date}')">
+        <span class="${state?.diary_count ? 'day-dot day-dot-left' : ''}"></span>
+        <span class="calendar-day-number">${day}</span>
+        <span class="${state?.inspection_count ? `day-dot day-dot-right ${inspectionClass(state.inspection_status)}` : ''}"></span>
+      </button>
+    `;
   }).join('');
 
-  el.innerHTML = months;
+  el.innerHTML = `
+    <div class="month-card single-month-card">
+      <div class="calendar-toolbar">
+        <button type="button" class="ghost-btn" onclick="shiftDiaryCalendarMonth(-1)">Předchozí</button>
+        <h3>${esc(monthNames[month])} ${year}</h3>
+        <button type="button" class="ghost-btn" onclick="shiftDiaryCalendarMonth(1)">Další</button>
+      </div>
+      <div class="month-grid weekday-grid">
+        ${weekdayNames.map((name) => `<span>${name}</span>`).join('')}
+      </div>
+      <div class="month-grid">${blanks}${cells}</div>
+    </div>
+  `;
+}
+
+function setDiaryCalendarDate(date, reload = true) {
+  if (!date) return;
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return;
+  diaryCalendarYear = parsed.getFullYear();
+  diaryCalendarMonth = parsed.getMonth();
+  if (reload) loadDiaryCalendar();
+}
+
+function shiftDiaryCalendarMonth(delta) {
+  const next = new Date(diaryCalendarYear, diaryCalendarMonth + delta, 1);
+  diaryCalendarYear = next.getFullYear();
+  diaryCalendarMonth = next.getMonth();
+  loadDiaryCalendar();
 }
 
 function focusDiaryDate(date) {
   const dateEl = document.getElementById('diaryDate');
   if (dateEl) dateEl.value = date;
+  setDiaryCalendarDate(date, false);
   setDiaryFilter('all');
   scrollToSection('diarySection');
+  scheduleDiaryWeatherAutoFill();
 }
 
 async function loadDiarySelects() {
@@ -2759,14 +2826,79 @@ function syncDiaryProductToSelection() {
 
 async function showDiaryLinks(id) {
   try {
+    const entry = lastDiaryEntries.find((item) => Number(item.id) === Number(id));
     const detail = await apiGet(`/diary/${id}/links`);
     const receipts = detail.suggested?.receipts || [];
     const documents = detail.suggested?.documents || [];
     const photos = detail.suggested?.photos || [];
-    alert(`Vazby k záznamu #${id}\nFaktury dle data: ${receipts.length}\nDokumenty dle data: ${documents.length}\nFotky dle data: ${photos.length}`);
+    const title = document.getElementById('diaryDetailTitle');
+    const content = document.getElementById('diaryDetailContent');
+    const panel = document.getElementById('diaryDetailPanel');
+    if (title) title.textContent = entry ? `Záznam ${entry.entry_date}` : `Záznam #${id}`;
+    if (content) {
+      content.innerHTML = `
+        <div class="diary-detail-body">${entry ? nl2br(entry.content) : ''}</div>
+        <div class="subsection">
+          <h3>Vazby podle data</h3>
+          <div class="link-list"><b>Faktury:</b> ${receipts.length ? receipts.map((item) => `<button type="button" class="ghost-btn" onclick="openMediaViewer('${fileUrl(item.file_path)}', '${esc(item.mime_type || '')}')">${esc(item.title || item.original_name || item.file_path)}</button>`).join('') : '<span class="muted">žádné</span>'}</div>
+          <div class="link-list"><b>Dokumenty:</b> ${documents.length ? documents.map((item) => `<button type="button" class="ghost-btn" onclick="openMediaViewer('${fileUrl(item.file_path)}', '${esc(item.mime_type || '')}')">${esc(item.name || item.original_name || item.file_path)}</button>`).join('') : '<span class="muted">žádné</span>'}</div>
+          <div class="link-list"><b>Fotky:</b> ${photos.length ? photos.map((item) => `<button type="button" class="ghost-btn" onclick="openMediaViewer('${fileUrl(item.file_path)}', '${esc(item.mime_type || '')}')">${esc(item.title || item.file_path)}</button>`).join('') : '<span class="muted">žádné</span>'}</div>
+        </div>
+        <div class="row-actions">
+          <button type="button" class="ghost-btn" onclick="deleteDiaryEntry(${id})">Smazat záznam</button>
+        </div>
+      `;
+    }
+    if (panel) panel.hidden = false;
   } catch (e) {
     alert(`MISS: ${e.message}`);
   }
+}
+
+function closeDiaryDetail() {
+  const panel = document.getElementById('diaryDetailPanel');
+  if (panel) panel.hidden = true;
+}
+
+async function deleteDiaryEntry(id) {
+  if (!confirm('Opravdu smazat záznam stavebního deníku?')) return;
+  try {
+    await apiDelete(`/diary/${id}`);
+    closeDiaryDetail();
+    await loadDiary();
+    await loadSelectedProductSummary();
+    setDiaryStatus(`Záznam #${id} smazán.`, 'ok');
+  } catch (e) {
+    alert(`MISS: ${e.message}`);
+  }
+}
+
+async function uploadDiaryPhotos(diaryId) {
+  const input = document.getElementById('diaryPhotos');
+  const files = Array.from(input?.files || []);
+  const productId = document.getElementById('diaryProduct')?.value || selectedProductId;
+  if (!files.length || !productId) return;
+
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append('product_id', productId);
+    fd.append('photo', file);
+    const response = await fetch(apiUrl('/photos/upload'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd
+    });
+    const photo = await parseJsonResponse(response, 'POST /photos/upload');
+    if (photo?.id) {
+      await apiPost(`/diary/${diaryId}/links`, {
+        entity_type: 'photo',
+        entity_id: photo.id,
+        link_reason: 'diary_upload'
+      });
+    }
+  }
+
+  if (input) input.value = '';
 }
 
 async function loadDiary() {
@@ -2785,6 +2917,7 @@ async function loadDiary() {
   }
 
   el.innerHTML = '';
+  lastDiaryEntries = data;
   const visibleData = data.filter((entry) => {
     if (diaryFilter !== 'product') return true;
     if (!selectedProductId) return false;
@@ -2824,7 +2957,7 @@ async function loadDiary() {
           </div>
         </div>
         <div>${nl2br(entry.content)}</div>
-        <small>Produkt: ${esc(productsMap[entry.product_id] || '-')} | Fáze: ${esc(phasesMap[entry.phase_id] || '-')} | Dozor: ${esc(inspectionStatus)}</small>
+        <small>Okruh: ${esc(productsMap[entry.product_id] || '-')} | Fáze: ${esc(phasesMap[entry.phase_id] || '-')} | Dozor: ${esc(inspectionStatus)}</small>
       </div>
     `;
   });
@@ -2839,7 +2972,7 @@ async function addDiaryEntry() {
   if (!content && !inspectionPresent) return alert('Napiš text nebo vyplň kontrolu stavebního dozoru.');
 
   try {
-    await apiPost('/diary', {
+    const savedEntry = await apiPost('/diary', {
       content,
       entry_date: document.getElementById('diaryDate').value || todayIsoDate(),
       time_from: document.getElementById('diaryTimeFrom').value || null,
@@ -2854,6 +2987,8 @@ async function addDiaryEntry() {
       inspection_status: document.getElementById('diaryInspectionStatus').value || 'ok',
       inspection_notes: document.getElementById('diaryInspectionNotes').value || ''
     });
+
+    if (savedEntry?.id) await uploadDiaryPhotos(savedEntry.id);
 
     document.getElementById('diaryContent').value = '';
     document.getElementById('diaryInspectionNotes').value = '';
@@ -2887,6 +3022,10 @@ async function bootApplication() {
   if (documentSearchInput) documentSearchInput.value = documentSearch;
   const documentSortSelect = document.getElementById('documentSort');
   if (documentSortSelect) documentSortSelect.value = documentSort;
+  ['diaryDate', 'diaryTimeFrom', 'diaryTimeTo'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', scheduleDiaryWeatherAutoFill);
+  });
 
   await runBootStep('API status', bootStatus);
   await runBootStep('produkty', loadProducts, (error) => {

@@ -496,16 +496,12 @@ body.theme-dark .theme-toggle span {
 }
 
 #diaryForm {
-  position: sticky;
-  bottom: 12px;
-  z-index: 4;
+  position: static;
   margin-bottom: 14px;
 }
 
 .calendar-panel {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
+  display: block;
   margin: 12px 0;
 }
 
@@ -516,19 +512,49 @@ body.theme-dark .theme-toggle span {
   background: var(--surface);
 }
 
+.single-month-card {
+  max-width: 760px;
+}
+
+.calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
 .month-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 4px;
+  gap: 6px;
+}
+
+.weekday-grid {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .calendar-day {
   position: relative;
-  min-height: 34px;
+  min-height: 54px;
   padding: 4px;
   border-color: var(--border);
   background: var(--surface-2);
   color: var(--text);
+}
+
+.calendar-blank {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.calendar-day-number {
+  font-weight: 800;
 }
 
 .calendar-red {
@@ -592,6 +618,38 @@ body.theme-dark .theme-toggle span {
 .icon-actions {
   display: flex;
   gap: 6px;
+}
+
+.app-footer {
+  margin: 0 28px 28px;
+}
+
+.watcher-footer {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.diary-detail-modal {
+  width: min(920px, 100%);
+}
+
+.diary-detail-body {
+  margin-bottom: 14px;
+}
+
+.link-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.upload-help {
+  margin-top: 8px;
 }
 
 #photosGrid {
