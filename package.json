@@ -1,6 +1,9 @@
 {
   "name": "rd-lounin-guide",
   "version": "0.1.0",
+  "scripts": {
+    "smoke": "node scripts/smoke-check.js"
+  },
   "dependencies": {
     "sqlite3": "^5.1.7"
   }
