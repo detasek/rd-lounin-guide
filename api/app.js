@@ -48,6 +48,7 @@ app.use('/api/products',  require('./routes/products'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/photos',    require('./routes/photos'));
 app.use('/api/receipts',  require('./routes/receipts'));
+app.use('/api/budget',    require('./routes/budget'));
 app.use('/api/upload',    require('./routes/upload'));
 
 // ----- HEALTH -----

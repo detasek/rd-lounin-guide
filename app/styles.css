@@ -201,13 +201,23 @@ pre {
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   border: 1px solid rgba(255, 255, 255, .16);
   border-radius: 8px;
   background: rgba(94, 234, 212, .12);
   color: var(--accent);
   font-weight: 800;
+}
+
+.brand-mark svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .eyebrow {
@@ -401,11 +411,18 @@ textarea {
 }
 
 .diary-photo-drop {
-  margin-top: 10px;
   padding: 12px;
   border: 1px dashed var(--border-strong);
   border-radius: 8px;
   background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
+.diary-attachments-row {
+  display: grid;
+  grid-template-columns: minmax(240px, .8fr) minmax(280px, 1.2fr);
+  gap: 12px;
+  align-items: start;
+  margin-top: 10px;
 }
 
 .checkbox-label {
@@ -470,43 +487,26 @@ button:hover {
 }
 
 .theme-toggle {
-  position: relative;
-  width: 72px;
-  padding: 0 9px;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  min-width: 48px;
+  height: 42px;
+  padding: 0;
+  font-size: 21px;
+  font-weight: 900;
 }
 
-.theme-toggle::before,
-.theme-toggle::after {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 12px;
-  font-weight: 800;
+.user-chip::before {
+  content: "◉";
+  margin-right: 7px;
+  color: var(--accent);
 }
 
-.theme-toggle::before {
-  content: "☀";
-  left: 12px;
-}
-
-.theme-toggle::after {
-  content: "☾";
-  right: 13px;
-}
-
-.theme-toggle span {
-  position: absolute;
-  top: 6px;
-  left: 7px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--accent);
-  transition: transform .2s ease;
-}
-
-body.theme-dark .theme-toggle span {
-  transform: translateX(32px);
+.icon-label-btn {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
 }
 
 .row-actions > button,
@@ -550,6 +550,106 @@ body.theme-dark .theme-toggle span {
 #watchFolderMedia {
   display: grid;
   gap: 10px;
+}
+
+#budgetList {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.budget-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.budget-main {
+  display: grid;
+  gap: 5px;
+}
+
+.budget-main small {
+  color: var(--muted);
+}
+
+.budget-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.budget-actions input {
+  width: 150px;
+  margin: 0;
+}
+
+.budget-progress,
+.ocr-progress {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.budget-progress span,
+.ocr-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ok);
+}
+
+.budget-row.over .budget-progress span,
+.ocr-progress.review span {
+  background: var(--accent-2);
+}
+
+.budget-row.over .budget-progress span {
+  background: var(--danger);
+}
+
+.budget-row.closed {
+  opacity: .82;
+}
+
+.receipt-card {
+  display: grid;
+  gap: 9px;
+}
+
+.receipt-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.receipt-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 4px 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.receipt-details {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.ocr-progress.idle span {
+  background: var(--muted);
 }
 
 #productsList {
@@ -727,7 +827,8 @@ body.theme-dark .theme-toggle span {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--sidebar);
+  color: var(--sidebar-text);
 }
 
 .single-month-card {
@@ -740,6 +841,19 @@ body.theme-dark .theme-toggle span {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.calendar-selectors {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.calendar-selectors select {
+  width: auto;
+  min-width: 130px;
+  margin: 0;
+  background: var(--surface);
 }
 
 .month-grid {
@@ -760,9 +874,9 @@ body.theme-dark .theme-toggle span {
   position: relative;
   min-height: 54px;
   padding: 4px;
-  border-color: var(--border);
-  background: var(--surface-2);
-  color: var(--text);
+  border-color: color-mix(in srgb, var(--sidebar-text) 16%, transparent);
+  background: #f8fafc;
+  color: #111827;
 }
 
 .calendar-blank {
@@ -777,6 +891,10 @@ body.theme-dark .theme-toggle span {
 
 .calendar-red {
   color: var(--danger);
+}
+
+.calendar-day:hover {
+  border-color: var(--accent);
 }
 
 .day-dot {
@@ -868,6 +986,46 @@ body.theme-dark .theme-toggle span {
 
 .diary-detail-body {
   margin-bottom: 14px;
+}
+
+.diary-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+
+.inspection-state {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.inspection-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.inspection-dot.inspection-ok {
+  background: var(--ok);
+}
+
+.inspection-dot.inspection-remarks {
+  background: var(--accent-2);
+}
+
+.inspection-dot.inspection-serious {
+  background: var(--danger);
+}
+
+.modal-close-btn {
+  min-width: 44px;
+  font-size: 24px;
+  line-height: 1;
 }
 
 .link-list {
@@ -973,7 +1131,9 @@ body.compact-mode .panel {
 
   .overview-grid,
   .split-grid,
-  .header-overview-panel {
+  .header-overview-panel,
+  .diary-attachments-row,
+  .budget-row {
     grid-template-columns: 1fr;
   }
 
@@ -1003,7 +1163,8 @@ body.compact-mode .panel {
   }
 
   .product-row,
-  .document-title-row {
+  .document-title-row,
+  .receipt-head {
     grid-template-columns: 1fr;
   }
 
@@ -1021,6 +1182,12 @@ body.compact-mode .panel {
 
   .mini-qr {
     justify-self: start;
+  }
+
+  .budget-actions input,
+  .calendar-selectors,
+  .calendar-selectors select {
+    width: 100%;
   }
 
   .day-dot-left {

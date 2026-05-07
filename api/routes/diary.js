@@ -343,6 +343,76 @@ router.post('/diary', (req, res) => {
   );
 });
 
+router.put('/diary/:id', (req, res) => {
+  const diaryId = Number(req.params.id);
+  if (!Number.isInteger(diaryId)) return res.status(400).json({ error: 'invalid_diary_id' });
+
+  const body = req.body || {};
+  const entryDate = safeDate(body.entry_date);
+  const timeFrom = safeTime(body.time_from);
+  const timeTo = safeTime(body.time_to);
+  const productId = body.product_id || null;
+  const phaseId = body.phase_id || null;
+  const inspectionPresent = body.inspection_present ? 1 : 0;
+  const inspectionPerson = String(body.inspection_person || DEFAULT_INSPECTION_PERSON).trim();
+  const inspectionStatus = inspectionPresent ? normalizeInspectionStatus(body.inspection_status) : 'none';
+  const inspectionNotes = normalizeNotes(body.inspection_notes);
+  const inspectionSummary = INSPECTION_STATUS[inspectionStatus]?.label || null;
+  const content = buildContent(body.content, inspectionPresent, inspectionPerson, inspectionStatus, inspectionNotes);
+  const temperatureAvg = body.temperature_avg === '' || body.temperature_avg === undefined || body.temperature_avg === null
+    ? null
+    : Number(body.temperature_avg);
+
+  if (!content) return res.status(400).json({ error: 'content_required' });
+
+  db.run(
+    `
+      UPDATE diary SET
+        entry_date = ?,
+        content = ?,
+        product_id = ?,
+        phase_id = ?,
+        time_from = ?,
+        time_to = ?,
+        weather_summary = ?,
+        temperature_avg = ?,
+        weather_source = ?,
+        inspection_present = ?,
+        inspection_person = ?,
+        inspection_status = ?,
+        inspection_summary = ?,
+        inspection_notes = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    [
+      entryDate,
+      content,
+      productId,
+      phaseId,
+      timeFrom,
+      timeTo,
+      body.weather_summary || null,
+      Number.isFinite(temperatureAvg) ? temperatureAvg : null,
+      body.weather_source || null,
+      inspectionPresent,
+      inspectionPerson,
+      inspectionStatus,
+      inspectionSummary,
+      JSON.stringify(inspectionNotes),
+      diaryId
+    ],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!this.changes) return res.status(404).json({ error: 'diary_not_found' });
+      db.get('SELECT * FROM diary WHERE id = ?', [diaryId], (getErr, row) => {
+        if (getErr) return res.status(500).json({ error: getErr.message });
+        res.json(row);
+      });
+    }
+  );
+});
+
 router.delete('/diary/:id', (req, res) => {
   const diaryId = Number(req.params.id);
   if (!Number.isInteger(diaryId)) return res.status(400).json({ error: 'invalid_diary_id' });

@@ -56,6 +56,7 @@ let diaryWeatherTimer = null;
 let diaryCalendarYear = new Date().getFullYear();
 let diaryCalendarMonth = new Date().getMonth();
 let lastDiaryEntries = [];
+let editingDiaryId = null;
 
 function closestAppSection(element) {
   return element ? element.closest('section[id]') : null;
@@ -71,7 +72,12 @@ function applyTheme(theme) {
   const nextTheme = theme === 'dark' ? 'dark' : 'light';
   document.body.classList.toggle('theme-dark', nextTheme === 'dark');
   const toggle = document.getElementById('themeToggle');
-  if (toggle) toggle.setAttribute('aria-pressed', String(nextTheme === 'dark'));
+  const icon = document.getElementById('themeIcon');
+  if (toggle) {
+    toggle.setAttribute('aria-pressed', String(nextTheme === 'dark'));
+    toggle.title = nextTheme === 'dark' ? 'Přepnout na světlý režim' : 'Přepnout na tmavý režim';
+  }
+  if (icon) icon.textContent = nextTheme === 'dark' ? '☀' : '☾';
   try {
     window.localStorage.setItem(THEME_KEY, nextTheme);
   } catch (_) {}
@@ -200,6 +206,14 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString('cs-CZ');
+}
+
+function formatMoney(value) {
+  return new Intl.NumberFormat('cs-CZ', {
+    style: 'currency',
+    currency: 'CZK',
+    maximumFractionDigits: 0
+  }).format(Number(value || 0));
 }
 
 async function copyText(value, successMessage = 'Zkopirovano.') {
@@ -859,6 +873,75 @@ async function loadProducts() {
   updateReceiptToolbar([]);
   saveTriagePrefs();
   loadSelectedProductSummary();
+}
+
+async function loadBudget() {
+  const el = document.getElementById('budgetList');
+  const summaryEl = document.getElementById('budgetSummary');
+  const statusEl = document.getElementById('budgetStatus');
+  if (!el) return;
+
+  try {
+    const rows = await apiGet('/budget');
+    const plannedTotal = rows.reduce((sum, item) => sum + Number(item.planned_amount || 0), 0);
+    const spentTotal = rows.reduce((sum, item) => sum + Number(item.spent_amount || 0), 0);
+    const remainingTotal = plannedTotal - spentTotal;
+    if (summaryEl) {
+      summaryEl.textContent = `Plán: ${formatMoney(plannedTotal)} | proinvestováno: ${formatMoney(spentTotal)} | zbývá: ${formatMoney(remainingTotal)}`;
+    }
+    if (statusEl) statusEl.textContent = `Položky: ${rows.length}`;
+
+    if (!rows.length) {
+      el.innerHTML = '<div class="card muted">Rozpočet zatím nemá stavební okruhy.</div>';
+      return;
+    }
+
+    el.innerHTML = rows.map((item) => {
+      const pct = Math.min(140, Math.max(0, Number(item.progress_pct || 0)));
+      const stateClass = item.is_over_budget ? 'over' : item.status === 'closed' ? 'closed' : 'ok';
+      return `
+        <div class="budget-row ${stateClass}">
+          <div class="budget-main">
+            <b>${esc(item.product_name || item.name)}</b>
+            <small>${esc(item.status === 'closed' ? 'uzavřeno' : 'otevřeno')} | plán ${formatMoney(item.planned_amount)} | čerpáno ${formatMoney(item.spent_amount)} | zbývá ${formatMoney(item.remaining_amount)}</small>
+            <div class="budget-progress" aria-label="Čerpání rozpočtu">
+              <span style="width:${pct}%;"></span>
+            </div>
+          </div>
+          <div class="budget-actions">
+            <input id="budget-planned-${item.product_id}" type="number" step="1000" value="${esc(item.planned_amount)}" aria-label="Plánovaná částka">
+            <button type="button" class="ghost-btn" onclick="saveBudgetItem(${item.product_id})">Uložit plán</button>
+            <button type="button" class="ghost-btn" onclick="closeBudgetItem(${item.product_id})">Uzavřít okruh</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    if (statusEl) statusEl.textContent = `MISS: ${e.message}`;
+    el.innerHTML = `<div class="card muted status-miss">MISS rozpočet: ${esc(e.message)}</div>`;
+  }
+}
+
+async function saveBudgetItem(productId) {
+  const input = document.getElementById(`budget-planned-${productId}`);
+  try {
+    await apiPut(`/budget/${productId}`, { planned_amount: input?.value || 0, status: 'open' });
+    await loadBudget();
+  } catch (e) {
+    alert(`MISS rozpočet: ${e.message}`);
+  }
+}
+
+async function closeBudgetItem(productId) {
+  if (!confirm('Uzavřít rozpočtový okruh a převést kladný zůstatek do disponibilní částky?')) return;
+  try {
+    const result = await apiPost(`/budget/${productId}/close`, { target_name: 'Disponibilní částka' });
+    await loadBudget();
+    const statusEl = document.getElementById('budgetStatus');
+    if (statusEl) statusEl.textContent = `Uzavřeno. Přesunuto: ${formatMoney(result.transferred || 0)}.`;
+  } catch (e) {
+    alert(`MISS rozpočet: ${e.message}`);
+  }
 }
 
 function openDocumentsForProduct(productId) {
@@ -2317,6 +2400,19 @@ function formatOcrSummary(receipt) {
   return `OCR navrh: ${parts.join(' | ')}`;
 }
 
+function receiptOcrStage(receipt) {
+  const status = receipt.ocr_status || 'not_processed';
+  if (status === 'approved') return { pct: 100, label: 'OCR schváleno', className: 'ok' };
+  if (status === 'review_needed') return { pct: 65, label: 'OCR čeká na kontrolu', className: 'review' };
+  if (status === 'not_processed' || !status) return { pct: 15, label: 'OCR zatím neproběhlo', className: 'idle' };
+  return { pct: 35, label: `OCR: ${status}`, className: 'review' };
+}
+
+function toggleReceiptDetails(id) {
+  const el = document.getElementById(`receipt-details-${id}`);
+  if (el) el.hidden = !el.hidden;
+}
+
 async function loadReceipts() {
   const el = document.getElementById('receiptsList');
   if (!el) return;
@@ -2345,26 +2441,39 @@ async function loadReceipts() {
     const ocrSummary = formatOcrSummary(receipt);
     const absolutePath = `/data${receipt.file_path}`;
     const createdAt = formatDateTime(receipt.created_at || '-');
+    const ocrStage = receiptOcrStage(receipt);
 
     el.innerHTML += `
-      <div class="card" id="receipt-card-${receipt.id}" style="${shouldHighlight ? 'border:2px solid #0f766e;' : ''}">
-        <img src="${qrUrl(receipt.id)}" style="float:right;width:40px;height:40px;">
-        <a href="#" onclick="openMediaViewer('${url}', '${esc(receipt.mime_type || '')}');return false;"><b>${docIcon(receipt)} ${esc(name)}</b></a>
+      <div class="card receipt-card" id="receipt-card-${receipt.id}" style="${shouldHighlight ? 'border:2px solid #0f766e;' : ''}">
+        <div class="receipt-head">
+          <a href="#" onclick="openMediaViewer('${url}', '${esc(receipt.mime_type || '')}');return false;"><b>${docIcon(receipt)} ${esc(name)}</b></a>
+          <button type="button" class="icon-btn" onclick="toggleReceiptDetails(${receipt.id})" title="Zobrazit podrobnosti">ⓘ</button>
+          <img src="${qrUrl(receipt.id)}" class="mini-qr receipt-qr" alt="QR faktury">
+        </div>
         ${receipt.warranty_until ? `<span style="margin-left:10px;padding:2px 6px;border-radius:6px;background:${warranty.color};color:white;font-size:12px;">${warranty.label}</span>` : ''}
-        <div class="muted">Dodavatel: ${esc(receipt.supplier || '-')} | Doklad: ${esc(receipt.document_number || '-')}</div>
-        <div class="muted">Datum nákupu / převzetí: ${esc(receipt.purchase_date || '-')} | Částka: ${esc(receipt.total_amount || '-')}</div>
-        <div class="muted">Status: ${esc(receipt.status || 'pending_review')} | OCR status: ${esc(receipt.ocr_status || 'not_processed')}</div>
-        <div class="muted">Vytvoreno: ${esc(createdAt)} | Cesta: ${esc(absolutePath)}</div>
-        <div class="muted">Záruka se počítá z pole Datum nákupu / převzetí, ne z data nahrání. OCR minimum je zatím jen rychlý návrh z názvu souboru; cílově má OCR hledat datum nákupu, dodání nebo převzetí přímo v dokladu.</div>
+        <div class="receipt-meta-grid">
+          <span>Dodavatel: ${esc(receipt.supplier || '-')}</span>
+          <span>Doklad: ${esc(receipt.document_number || '-')}</span>
+          <span>Datum nákupu / převzetí: ${esc(receipt.purchase_date || '-')}</span>
+          <span>Částka: ${esc(receipt.total_amount || '-')}</span>
+        </div>
+        <div class="ocr-progress ${ocrStage.className}" title="${esc(ocrStage.label)}">
+          <span style="width:${ocrStage.pct}%;"></span>
+        </div>
+        <div class="muted">${esc(ocrStage.label)} | Stav dokladu: ${esc(receipt.status || 'pending_review')}</div>
+        <div id="receipt-details-${receipt.id}" class="receipt-details" hidden>
+          <div class="muted">Vytvořeno: ${esc(createdAt)} | Cesta: ${esc(absolutePath)}</div>
+          <div class="muted">Záruka se počítá z pole Datum nákupu / převzetí, ne z data nahrání. OCR minimum je zatím jen rychlý návrh z názvu souboru; cílově má OCR hledat datum nákupu, dodání nebo převzetí přímo v dokladu.</div>
+        </div>
         ${ocrSummary ? `<div class="muted">${esc(ocrSummary)}</div>` : ''}
         <div class="row-actions">
-          ${isPdf ? `<button class="ghost-btn" onclick="togglePreview('receipt-${receipt.id}')">Nahled</button>` : ''}
-          <button class="ghost-btn" onclick="runReceiptOcrMinimum(${receipt.id})">OCR minimum</button>
-          <button class="ghost-btn" onclick="approveReceiptOcr(${receipt.id})">Schvalit OCR</button>
+          ${isPdf || isImg ? `<button class="ghost-btn" title="Otevře PDF nebo obrázek dokladu přímo v aplikaci." onclick="togglePreview('receipt-${receipt.id}')">Náhled</button>` : ''}
+          <button class="ghost-btn" title="Spustí dočasné OCR minimum. Teď hledá hlavně údaje z názvu souboru; plné OCR přijde v další fázi." onclick="runReceiptOcrMinimum(${receipt.id})">OCR návrh</button>
+          <button class="ghost-btn" title="Potvrdí nalezený OCR návrh a označí ho jako schválený." onclick="approveReceiptOcr(${receipt.id})">Schválit OCR</button>
           <button onclick="togglePreview('receipt-edit-${receipt.id}')">Upravit</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(name)}, "Název zkopírován.")'>Kopírovat název</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(receipt.document_number || '')}, "Číslo dokladu zkopírováno.")'>Kopírovat doklad</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopírována.")'>Kopírovat cestu</button>
+          <button class="ghost-btn" title="Zkopíruje název pro rychlé vložení do mailu, poznámky nebo vyhledávání." onclick='copyText(${JSON.stringify(name)}, "Název zkopírován.")'>Kopírovat název</button>
+          <button class="ghost-btn" title="Zkopíruje číslo dokladu pro párování s platbou nebo komunikaci s dodavatelem." onclick='copyText(${JSON.stringify(receipt.document_number || '')}, "Číslo dokladu zkopírováno.")'>Kopírovat doklad</button>
+          <button class="ghost-btn" title="Zkopíruje interní cestu k souboru na NAS." onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopírována.")'>Kopírovat cestu</button>
           <button class="ghost-btn" onclick="deleteReceipt(${receipt.id})">Smazat</button>
         </div>
 
@@ -2414,6 +2523,7 @@ async function saveReceipt(id) {
       warranty_note: document.getElementById(`receipt-warranty-note-${id}`).value
     });
     await loadReceipts();
+    await loadBudget();
     setReceiptStatus(`Receipt #${id} ulozen.`, 'ok');
     await loadWatcherMinimum();
     await loadSelectedProductSummary();
@@ -2427,6 +2537,7 @@ async function deleteReceipt(id) {
   try {
     await apiDelete(`/receipts/${id}`);
     await loadReceipts();
+    await loadBudget();
     setReceiptStatus(`Receipt #${id} smazan.`, 'ok');
     await loadWatcherMinimum();
     await loadSelectedProductSummary();
@@ -2457,6 +2568,7 @@ async function uploadReceipt(e) {
     document.getElementById('receiptTitle').value = '';
     document.getElementById('receiptFile').value = '';
     await loadReceipts();
+    await loadBudget();
     setReceiptStatus('Receipt nahran.', 'ok');
     await loadWatcherMinimum();
     await loadSelectedProductSummary();
@@ -2817,7 +2929,14 @@ async function loadDiaryCalendar() {
     <div class="month-card single-month-card">
       <div class="calendar-toolbar">
         <button type="button" class="ghost-btn" onclick="shiftDiaryCalendarMonth(-1)">Předchozí</button>
-        <h3>${esc(monthNames[month])} ${year}</h3>
+        <div class="calendar-selectors">
+          <select id="diaryCalendarMonth" onchange="setDiaryCalendarMonthYear()" aria-label="Měsíc deníku">
+            ${monthNames.map((name, index) => `<option value="${index}" ${index === month ? 'selected' : ''}>${esc(name)}</option>`).join('')}
+          </select>
+          <select id="diaryCalendarYear" onchange="setDiaryCalendarMonthYear()" aria-label="Rok deníku">
+            ${[2026, 2027, 2028].map((item) => `<option value="${item}" ${item === year ? 'selected' : ''}>${item}</option>`).join('')}
+          </select>
+        </div>
         <button type="button" class="ghost-btn" onclick="shiftDiaryCalendarMonth(1)">Další</button>
       </div>
       <div class="month-grid weekday-grid">
@@ -2839,6 +2958,7 @@ function setDiaryCalendarDate(date, reload = true) {
 
 function shiftDiaryCalendarMonth(delta) {
   const next = new Date(diaryCalendarYear, diaryCalendarMonth + delta, 1);
+  if (next.getFullYear() < 2026 || next.getFullYear() > 2028) return;
   diaryCalendarYear = next.getFullYear();
   diaryCalendarMonth = next.getMonth();
   loadDiaryCalendar();
@@ -2855,6 +2975,18 @@ function focusDiaryDate(date) {
   if (entryForDate) {
     showDiaryLinks(entryForDate.id);
   }
+}
+
+function setDiaryCalendarMonthYear() {
+  const yearEl = document.getElementById('diaryCalendarYear');
+  const monthEl = document.getElementById('diaryCalendarMonth');
+  const year = Number(yearEl?.value);
+  const month = Number(monthEl?.value);
+  if (!Number.isInteger(year) || year < 2026 || year > 2028) return;
+  if (!Number.isInteger(month) || month < 0 || month > 11) return;
+  diaryCalendarYear = year;
+  diaryCalendarMonth = month;
+  loadDiaryCalendar();
 }
 
 async function loadDiarySelects() {
@@ -2901,8 +3033,16 @@ async function showDiaryLinks(id) {
     const content = document.getElementById('diaryDetailContent');
     const panel = document.getElementById('diaryDetailPanel');
     if (title) title.textContent = entry ? `Záznam ${entry.entry_date}` : `Záznam #${id}`;
+    const inspectionClassName = inspectionClass(entry?.inspection_status);
+    const inspectionLabel = entry?.inspection_present
+      ? (entry.inspection_summary || entry.inspection_status || 'kontrola evidována')
+      : 'bez kontroly stavebního dozoru';
     if (content) {
       content.innerHTML = `
+        <div class="diary-detail-meta">
+          <span>Stavební dozor</span>
+          <span class="inspection-state"><i class="inspection-dot ${inspectionClassName}"></i>${esc(inspectionLabel)}</span>
+        </div>
         <div class="diary-detail-body">${entry ? nl2br(entry.content) : ''}</div>
         <div class="subsection">
           <h3>Vazby podle data</h3>
@@ -2911,6 +3051,7 @@ async function showDiaryLinks(id) {
           <div class="link-list"><b>Fotky:</b> ${photos.length ? photos.map((item) => `<button type="button" class="ghost-btn" onclick="openMediaViewer('${fileUrl(item.file_path)}', '${esc(item.mime_type || '')}')">${esc(item.title || item.file_path)}</button>`).join('') : '<span class="muted">žádné</span>'}</div>
         </div>
         <div class="row-actions">
+          <button type="button" class="ghost-btn" onclick="editDiaryEntry(${id})">Upravit</button>
           <button type="button" class="ghost-btn" onclick="deleteDiaryEntry(${id})">Smazat záznam</button>
         </div>
       `;
@@ -2919,6 +3060,37 @@ async function showDiaryLinks(id) {
   } catch (e) {
     alert(`MISS: ${e.message}`);
   }
+}
+
+function editDiaryEntry(id) {
+  const entry = lastDiaryEntries.find((item) => Number(item.id) === Number(id));
+  if (!entry) return;
+  const setters = {
+    diaryDate: entry.entry_date || todayIsoDate(),
+    diaryTimeFrom: entry.time_from || '08:00',
+    diaryTimeTo: entry.time_to || '18:00',
+    diaryWeatherSummary: entry.weather_summary || '',
+    diaryTemperatureAvg: entry.temperature_avg ?? '',
+    diaryProduct: entry.product_id || '',
+    diaryPhase: entry.phase_id || '',
+    diaryInspectionPerson: entry.inspection_person || 'Ing. Hana Konvalinková',
+    diaryInspectionStatus: entry.inspection_status || 'ok',
+    diaryInspectionNotes: entry.inspection_notes || '',
+    diaryContent: entry.content || ''
+  };
+  Object.entries(setters).forEach(([idKey, value]) => {
+    const el = document.getElementById(idKey);
+    if (el) el.value = value;
+  });
+  const present = document.getElementById('diaryInspectionPresent');
+  if (present) present.checked = Boolean(entry.inspection_present);
+  editingDiaryId = Number(id);
+  toggleInspectionFields();
+  closeDiaryDetail();
+  scrollToSection('diaryForm');
+  const saveButton = document.getElementById('diarySaveButton');
+  if (saveButton) saveButton.textContent = 'Uložit úpravy';
+  setDiaryStatus(`Upravuješ záznam #${id}.`, 'ok');
 }
 
 function closeDiaryDetail() {
@@ -3019,7 +3191,7 @@ async function loadDiary() {
           </div>
           <div class="icon-actions">
             <button type="button" class="icon-btn" title="Zobrazit záznam" onclick="event.stopPropagation(); showDiaryLinks(${entry.id})">◉</button>
-            <button type="button" class="icon-btn" title="Upravit" onclick="event.stopPropagation()">✎</button>
+            <button type="button" class="icon-btn" title="Upravit" onclick="event.stopPropagation(); editDiaryEntry(${entry.id})">✎</button>
           </div>
         </div>
         <div>${nl2br(entry.content)}</div>
@@ -3038,7 +3210,7 @@ async function addDiaryEntry() {
   if (!content && !inspectionPresent) return alert('Napiš text nebo vyplň kontrolu stavebního dozoru.');
 
   try {
-    const savedEntry = await apiPost('/diary', {
+    const payload = {
       content,
       entry_date: document.getElementById('diaryDate').value || todayIsoDate(),
       time_from: document.getElementById('diaryTimeFrom').value || null,
@@ -3052,13 +3224,19 @@ async function addDiaryEntry() {
       inspection_person: document.getElementById('diaryInspectionPerson').value || 'Ing. Hana Konvalinková',
       inspection_status: document.getElementById('diaryInspectionStatus').value || 'ok',
       inspection_notes: document.getElementById('diaryInspectionNotes').value || ''
-    });
+    };
+    const savedEntry = editingDiaryId
+      ? await apiPut(`/diary/${editingDiaryId}`, payload)
+      : await apiPost('/diary', payload);
 
     if (savedEntry?.id) await uploadDiaryPhotos(savedEntry.id);
 
     document.getElementById('diaryContent').value = '';
     document.getElementById('diaryInspectionNotes').value = '';
     document.getElementById('diaryInspectionPresent').checked = false;
+    editingDiaryId = null;
+    const saveButton = document.getElementById('diarySaveButton');
+    if (saveButton) saveButton.textContent = 'Uložit záznam';
     toggleInspectionFields();
     await loadDiarySelects();
     await loadDiary();
@@ -3101,6 +3279,10 @@ async function bootApplication() {
   await runBootStep('dokumenty', loadDocuments, (error) => setDocumentStatus(`MISS: ${error.message}`, 'miss'));
   await runBootStep('media', loadPhotos, (error) => setPhotoStatus(`MISS: ${error.message}`, 'miss'));
   await runBootStep('receipts', loadReceipts, (error) => setReceiptStatus(`MISS: ${error.message}`, 'miss'));
+  await runBootStep('rozpočet', loadBudget, (error) => {
+    const el = document.getElementById('budgetStatus');
+    if (el) el.textContent = `MISS: ${error.message}`;
+  });
   await runBootStep('watch-folder', loadWatchFolderMedia, (error) => setPhotoStatus(`MISS watch-folder: ${error.message}`, 'miss'));
   await runBootStep('diary selects', loadDiarySelects, (error) => setDiaryStatus(`MISS selects: ${error.message}`, 'miss'));
   await runBootStep('diary', loadDiary, (error) => setDiaryStatus(`MISS: ${error.message}`, 'miss'));

@@ -50,7 +50,13 @@
   <div id="appShell" class="app-shell" hidden>
     <aside class="sidebar" aria-label="Hlavní navigace">
       <div class="brand-block">
-        <div class="brand-mark">RD</div>
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img">
+            <path d="M3 11.5 12 4l9 7.5" />
+            <path d="M5.5 10.5V20h13v-9.5" />
+            <path d="M9 20v-6h6v6" />
+          </svg>
+        </div>
         <div>
           <div class="eyebrow">RD Lounín</div>
           <h1>Průvodce stavbou</h1>
@@ -60,6 +66,7 @@
         <button type="button" class="nav-link active" data-section="productsSection">Stavební okruhy</button>
         <button type="button" class="nav-link" data-section="documentsSection">Dokumenty</button>
         <button type="button" class="nav-link" data-section="receiptsSection">Faktury</button>
+        <button type="button" class="nav-link" data-section="budgetSection">Rozpočet</button>
         <button type="button" class="nav-link" data-section="mediaSection">Média</button>
         <button type="button" class="nav-link" data-section="diarySection">Deník</button>
               </nav>
@@ -77,10 +84,13 @@
         </div>
         <div class="top-actions">
           <button type="button" class="ghost-btn" onclick="toggleHeaderOverview()">Stav</button>
-          <button type="button" class="ghost-btn" id="userButton" onclick="openUserPanel()">Uživatel</button>
-          <button type="button" class="ghost-btn" onclick="logoutUser()">Odhlásit</button>
+          <button type="button" class="ghost-btn user-chip" id="userButton" onclick="openUserPanel()">Uživatel</button>
+          <button type="button" class="ghost-btn icon-label-btn" onclick="logoutUser()" title="Odhlásit">
+            <span aria-hidden="true">⎋</span>
+            <span>Odhlásit</span>
+          </button>
           <button type="button" class="theme-toggle" id="themeToggle" aria-label="Přepnout světlé/tmavé téma" aria-pressed="false">
-            <span></span>
+            <span id="themeIcon">☾</span>
           </button>
         </div>
         <div id="headerOverviewPanel" class="header-overview-panel" hidden>
@@ -111,18 +121,18 @@
           </div>
           <div class="split-grid">
             <form id="productForm" class="form-panel">
-              <h3>Nový produkt</h3>
-              <input id="name" placeholder="Název produktu" required>
-              <textarea id="description" placeholder="Popis"></textarea>
+              <h3>Nový stavební okruh</h3>
+              <input id="name" placeholder="Název stavebního okruhu" required>
+              <textarea id="description" placeholder="Popis okruhu"></textarea>
               <button type="submit">Uložit</button>
-              <div id="productTemplateStatus" class="muted">Rychlý start produktu: připraven.</div>
+              <div id="productTemplateStatus" class="muted">Rychlý start okruhů: připraven.</div>
               <div class="row-actions">
                 <button type="button" class="ghost-btn" onclick="createStarterProducts('top8')">Založit prvních 8</button>
                 <button type="button" class="ghost-btn" onclick="createStarterProducts('all16')">Založit všech 16</button>
               </div>
             </form>
             <div class="list-panel">
-              <h3>Seznam produktů</h3>
+              <h3>Seznam stavebních okruhů</h3>
               <div id="productsList"></div>
             </div>
           </div>
@@ -220,6 +230,21 @@
           </form>
         </section>
 
+        <section id="budgetSection" class="panel">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Finance stavby</p>
+              <h2>Rozpočet</h2>
+              <div id="budgetSummary" class="muted">Plán, faktury, čerpání a disponibilní částka.</div>
+            </div>
+            <div id="budgetStatus" class="muted">Připraveno.</div>
+          </div>
+          <div class="upload-help muted">
+            Import Excelu doplníme nad reálným rozpočtem, aby se správně namapovaly sloupce a stavební okruhy.
+          </div>
+          <div id="budgetList"></div>
+        </section>
+
         <section id="mediaSection" class="panel">
           <div class="section-header">
             <div>
@@ -281,7 +306,7 @@
               <div>
                 <label>Počasí</label>
                 <select id="diaryWeatherSummary">
-                  <option value="">Doplnit z API</option>
+                  <option value="">Auto</option>
                   <option value="slunecno">Slunečno</option>
                   <option value="zatazeno">Zataženo</option>
                   <option value="dest">Déšť</option>
@@ -291,7 +316,7 @@
               </div>
               <div>
                 <label>Průměrná teplota °C</label>
-                <input id="diaryTemperatureAvg" type="number" step="0.1" placeholder="auto">
+                <input id="diaryTemperatureAvg" type="number" step="0.1" placeholder="Auto">
                 <small class="field-help">Průměrná teplota za pracovní interval.</small>
               </div>
               <div>
@@ -306,12 +331,13 @@
               </div>
             </div>
             <textarea id="diaryContent" placeholder="Co se dnes dělalo..."></textarea>
-            <div class="diary-photo-drop">
-              <label>Fotky k zápisu</label>
-              <input id="diaryPhotos" type="file" multiple accept="image/*,video/*">
-              <small class="field-help">Fotky nebo videa se uloží k vybranému stavebnímu okruhu a propojí se se záznamem.</small>
-            </div>
-            <div class="inspection-box">
+            <div class="diary-attachments-row">
+              <div class="diary-photo-drop">
+                <label>Fotky k zápisu</label>
+                <input id="diaryPhotos" type="file" multiple accept="image/*,video/*">
+                <small class="field-help">Fotky nebo videa se uloží k vybranému stavebnímu okruhu a propojí se se záznamem.</small>
+              </div>
+              <div class="inspection-box">
               <label class="checkbox-label">
                 <input id="diaryInspectionPresent" type="checkbox" onchange="toggleInspectionFields()">
                 Kontrola stavebního dozoru
@@ -329,8 +355,9 @@
                 <label>Připomínky stavebního dozoru</label>
                 <textarea id="diaryInspectionNotes" placeholder="Každou připomínku napiš na samostatný řádek."></textarea>
               </div>
+              </div>
             </div>
-            <button type="button" onclick="addDiaryEntry()">Uložit záznam</button>
+            <button type="button" id="diarySaveButton" onclick="addDiaryEntry()">Uložit záznam</button>
           </div>
           <div id="diaryCalendar" class="calendar-panel"></div>
           <div id="diaryList"></div>
@@ -373,7 +400,7 @@
           <p class="eyebrow">Stavební deník</p>
           <h2 id="diaryDetailTitle">Záznam</h2>
         </div>
-        <button type="button" class="ghost-btn" onclick="closeDiaryDetail()">Zavřít</button>
+        <button type="button" class="icon-btn modal-close-btn" onclick="closeDiaryDetail()" title="Zavřít" aria-label="Zavřít">×</button>
       </div>
       <div id="diaryDetailContent" class="card muted">Načítám záznam...</div>
     </div>

@@ -1039,3 +1039,48 @@ Ověřeno lokálně:
 - `api/routes/auth.js` syntax check
 - `api/app.js` syntax check
 - `scripts/smoke-check.js`
+
+---
+
+## UX GUIDE C.4 CHECKPOINT (2026-05-07)
+
+Lokální navazující změny podle ladění produkční verze:
+- Stavební deník:
+  - detail záznamu má místo textového tlačítka `Zavřít` piktogram `×`
+  - detail záznamu ukazuje stav stavebního dozoru s barevnou tečkou
+  - detail záznamu má akce `Upravit` a `Smazat záznam`
+  - úprava záznamu už používá backend `PUT /api/diary/:id`
+- Kalendář:
+  - přidán výběr měsíce a roku z rozbalovacích polí
+  - povolené roky jsou 2026, 2027, 2028
+  - světlý režim kalendáře má výraznější denní buňky ve tmavším rámečku měsíce
+- Horní lišta a brand:
+  - přepínač světlý/tmavý režim je jedna ikonka
+  - ve světlém režimu je vidět měsíc, v tmavém režimu slunce
+  - logo v levém menu je piktogram domu
+  - uživatel a odhlášení jsou výraznější akce v topbaru
+- Deníkový formulář:
+  - fotky k zápisu jsou kompaktně vedle kontroly stavebního dozoru
+  - počasí má volbu `Auto`
+  - teplota má placeholder `Auto`
+- Faktury:
+  - metadata dokladu jsou přehlednější
+  - podrobnosti včetně QR/cesty jsou rozbalovací
+  - OCR má jednoduchý progress/stav
+  - akce mají tooltip nápovědu
+- Rozpočet:
+  - přidána první bezpečná backend route `/api/budget`
+  - přidána tabulka `budget_items`
+  - přidána tabulka `budget_transfers`
+  - frontend sekce `Rozpočet` ukazuje plán, proinvestováno, zbývá a progress podle faktur ve stavebním okruhu
+  - okruh jde uzavřít a kladný zůstatek se převede do `Disponibilní částka`
+
+Poznámka:
+- Import Excel rozpočtu je připravený jako další krok nad reálným souborem, aby se správně namapovaly sloupce.
+
+Ověřeno lokálně:
+- `app/app.js` syntax check
+- `api/routes/budget.js` syntax check
+- `api/routes/diary.js` syntax check
+- `api/app.js` syntax check
+- `scripts/smoke-check.js`
