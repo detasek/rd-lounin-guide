@@ -770,3 +770,37 @@ Nasadit po tomto checkpointu:
 - `app/app.js`
 - `docs/current-state.md`
 - odstranit vyse uvedene backup soubory z NAS workspace, pokud tam existuji
+
+---
+
+## STAGE B - COMPLETE LOCAL CHECKPOINT (2026-05-07)
+
+Stage B lokalne uzavrena:
+- dokoncena NAS verification priprava
+- dokoncena UX drift stabilizace
+- dokoncena mala refaktor/cleanup faze
+- dokoncena code review kontrola aktivnich JS souboru
+
+Finalni lokalni verifikace:
+- `git diff --check`
+- syntax check 23 aktivnich JS souboru
+- grep drift signalu:
+  - zadna pevna `192.168` API IP v trackovanem kodu
+  - zadne trackovane `.bak` runtime soubory
+  - zadne `photos.updated_at` v aktivnich routes
+- DB schema pass proti lokalni `data/db.sqlite`
+- static frontend smoke:
+  - `index.html` HTTP 200
+  - `app.js` HTTP 200
+  - `config.js` HTTP 200
+
+Finalni deploy balik na NAS:
+- `api/routes/documents.js`
+- `api/routes/photos.js`
+- `app/config.js`
+- `app/app.js`
+- `app/index.html`
+- `docs/current-state.md`
+
+NAS cleanup:
+- odstranit historicke `.bak` / `backup` soubory z `api`, `app`, `docs`, pokud tam existuji
