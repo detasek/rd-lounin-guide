@@ -756,6 +756,7 @@ Lokalni cleanup:
   - `api/server.core.backup.js`
   - `docs/current-state.md.bak_after_watch_video`
   - `docs/current-state.md.bak_watch_video`
+- Odstraneny i ignorovane lokalni `.bak` artefakty z `api` a `app`, aby se omylem nekopirovaly na NAS.
 - Document triage refaktor:
   - pridany helper `isDocumentScopeSelected()`
   - pridany helper `getDocumentScopePath()`
