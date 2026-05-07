@@ -132,7 +132,7 @@ router.put('/:id', (req, res) => {
 
     db.run(
       `UPDATE photos
-       SET title = ?, updated_at = CURRENT_TIMESTAMP
+       SET title = ?
        WHERE id = ?`,
       [title || row.title || null, id],
       function (updateErr) {

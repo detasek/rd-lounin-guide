@@ -674,6 +674,7 @@ Důležité:
   - media_kind
   - updated_at
 - backend media_kind normalizuje runtime logikou
+- media rename je kompatibilni s photos schema bez `updated_at`
 
 Ověřené testy:
 
