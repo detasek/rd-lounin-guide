@@ -844,7 +844,7 @@ function buildSuggestedDocumentBuckets(docsWithSuggestion) {
 
   docsWithSuggestion.forEach((doc) => {
     const suggestion = doc._suggestion;
-    if (!suggestion || Number(suggestion.productId) === Number(doc.product_id)) return;
+    if (!isActionableSuggestedDocument(doc)) return;
 
     const key = String(suggestion.productId);
     if (!buckets.has(key)) {
@@ -881,6 +881,15 @@ function buildCurrentDocumentBuckets(docs) {
     if (b.count !== a.count) return b.count - a.count;
     return String(a.productName).localeCompare(String(b.productName), 'cs');
   });
+}
+
+function isActionableSuggestedDocument(doc) {
+  return !isDeferredDocument(doc.id)
+    && !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+}
+
+function isActionableUnsortedDocument(doc) {
+  return !isDeferredDocument(doc.id) && !doc._suggestion;
 }
 
 function sortDocumentsForView(docs) {
@@ -922,16 +931,13 @@ function getVisibleDocumentsForCurrentView(docs) {
     if (documentFilter === 'deferred') return isDeferred;
     if (documentFilter === 'all') return true;
     if (documentFilter === 'todo') {
-      if (isDeferred) return false;
-      return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id)) || !doc._suggestion;
+      return isActionableSuggestedDocument(doc) || isActionableUnsortedDocument(doc);
     }
     if (documentFilter === 'suggested') {
-      if (isDeferred) return false;
-      return !!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+      return isActionableSuggestedDocument(doc);
     }
     if (documentFilter === 'unsorted') {
-      if (isDeferred) return false;
-      return !doc._suggestion;
+      return isActionableUnsortedDocument(doc);
     }
     return getDocumentKind(doc) === documentFilter;
   }));
@@ -959,9 +965,9 @@ async function loadDocuments() {
     return (duplicateMap.get(key) || 0) > 1;
   }).length;
   const deferredCount = docsWithSuggestion.filter((doc) => isDeferredDocument(doc.id)).length;
-  const unsortedCount = docsWithSuggestion.filter((doc) => !doc._suggestion && !isDeferredDocument(doc.id)).length;
-  const actionableSuggested = docsWithSuggestion.filter((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id) && !isDeferredDocument(doc.id));
-  const actionableUnsorted = docsWithSuggestion.filter((doc) => !doc._suggestion && !isDeferredDocument(doc.id));
+  const unsortedCount = docsWithSuggestion.filter((doc) => isActionableUnsortedDocument(doc)).length;
+  const actionableSuggested = docsWithSuggestion.filter((doc) => isActionableSuggestedDocument(doc));
+  const actionableUnsorted = docsWithSuggestion.filter((doc) => isActionableUnsortedDocument(doc));
   const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
   const currentBuckets = buildCurrentDocumentBuckets(docsWithSuggestion);
   const inWorkbench = scopedToSelected && isProjectDocsWorkbench(selectedProductName());
@@ -1131,7 +1137,7 @@ async function moveAllSuggestedDocuments() {
   const docs = await apiGet(path);
   const candidates = docs
     .map((doc) => ({ doc, suggestion: suggestDocumentTarget(doc) }))
-    .filter((item) => item.suggestion && Number(item.suggestion.productId) !== Number(item.doc.product_id));
+    .filter((item) => !isDeferredDocument(item.doc.id) && item.suggestion && Number(item.suggestion.productId) !== Number(item.doc.product_id));
 
   if (!candidates.length) {
     setDocumentStatus('Zadne doporucene presuny.', 'ok');
@@ -1164,7 +1170,7 @@ async function moveVisibleSuggestedDocuments() {
   const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
   const docs = await apiGet(path);
   const visibleDocs = getVisibleDocumentsForCurrentView(docs)
-    .filter((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+    .filter((doc) => isActionableSuggestedDocument(doc));
 
   if (!visibleDocs.length) {
     setDocumentStatus('Zadne viditelne doporucene dokumenty k presunu.', 'ok');
@@ -1349,7 +1355,7 @@ async function openNextSuggestedDocument() {
   const docs = await apiGet(path);
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
-    .find((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+    .find((doc) => isActionableSuggestedDocument(doc));
 
   if (!candidate) {
     setDocumentStatus('Zadny dalsi doporuceny dokument.', 'ok');
@@ -1369,7 +1375,7 @@ async function openNextUnsortedDocument() {
   const docs = await apiGet(path);
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
-    .find((doc) => !doc._suggestion);
+    .find((doc) => isActionableUnsortedDocument(doc));
 
   if (!candidate) {
     setDocumentStatus('Zadny dalsi dokument bez navrhu.', 'ok');
@@ -1389,7 +1395,7 @@ async function moveNextSuggestedDocument() {
   const docs = await apiGet(path);
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
-    .find((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+    .find((doc) => isActionableSuggestedDocument(doc));
 
   if (!candidate) {
     setDocumentStatus('Zadny dalsi doporuceny dokument k presunu.', 'ok');
@@ -1410,7 +1416,7 @@ async function moveNextUnsortedDocumentToLastTarget() {
   const docs = await apiGet(path);
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
-    .find((doc) => !doc._suggestion);
+    .find((doc) => isActionableUnsortedDocument(doc));
 
   if (!candidate) {
     setDocumentStatus('Zadny dalsi dokument bez navrhu k zarazeni.', 'ok');
@@ -1439,7 +1445,7 @@ async function deferNextActionableDocument() {
   const docs = await apiGet(path);
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
-    .find((doc) => !isDeferredDocument(doc.id) && (!!(doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id)) || !doc._suggestion));
+    .find((doc) => isActionableSuggestedDocument(doc) || isActionableUnsortedDocument(doc));
 
   if (!candidate) {
     setDocumentStatus('Zadny dalsi dokument k odlozeni.', 'ok');
@@ -1469,7 +1475,7 @@ async function continueWorkbenchQueue(prefer = null) {
   const path = `/documents?product_id=${selectedProductId}`;
   const docs = await apiGet(path);
   const docsWithSuggestion = docs.map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }));
-  const nextSuggested = docsWithSuggestion.find((doc) => doc._suggestion && Number(doc._suggestion.productId) !== Number(doc.product_id));
+  const nextSuggested = docsWithSuggestion.find((doc) => isActionableSuggestedDocument(doc));
   if (nextSuggested) {
     documentFilter = 'suggested';
     openDocumentEditorId = nextSuggested.id;
@@ -1479,7 +1485,7 @@ async function continueWorkbenchQueue(prefer = null) {
     return;
   }
 
-  const nextUnsorted = docsWithSuggestion.find((doc) => !doc._suggestion);
+  const nextUnsorted = docsWithSuggestion.find((doc) => isActionableUnsortedDocument(doc));
   if (nextUnsorted) {
     documentFilter = 'unsorted';
     openDocumentEditorId = nextUnsorted.id;

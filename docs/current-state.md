@@ -643,6 +643,7 @@ Stage 2 – STRUKTURA
       - workbench count of deferred documents
       - `Jen odlozene` view in workbench
       - `Odlozit dalsi k reseni` fast action
+      - deferred documents are skipped by next/batch triage actions until returned to queue
       - deferred document ids persist in browser local storage
 
 ---
