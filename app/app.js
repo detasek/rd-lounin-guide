@@ -714,6 +714,14 @@ function setDocumentSort(value) {
   loadDocuments();
 }
 
+function isDocumentScopeSelected() {
+  return documentScope === 'selected' && selectedProductId;
+}
+
+function getDocumentScopePath() {
+  return isDocumentScopeSelected() ? `/documents?product_id=${selectedProductId}` : '/documents';
+}
+
 async function deferDocument(docId) {
   deferDocumentId(docId);
   await loadDocuments();
@@ -727,9 +735,7 @@ async function undeferDocument(docId) {
 }
 
 async function undeferAllVisibleDocuments() {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const visibleDeferredDocs = getVisibleDocumentsForCurrentView(docs)
     .filter((doc) => isDeferredDocument(doc.id));
 
@@ -744,9 +750,7 @@ async function undeferAllVisibleDocuments() {
 }
 
 async function deferAllVisibleActionableDocuments() {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const visibleActionableDocs = getVisibleDocumentsForCurrentView(docs)
     .filter((doc) => isActionableSuggestedDocument(doc) || isActionableUnsortedDocument(doc));
 
@@ -986,9 +990,7 @@ async function loadDocuments() {
   const workbenchEl = document.getElementById('documentWorkbench');
   if (!el) return;
 
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const docsWithSuggestion = docs.map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }));
   const pdfCount = docs.filter((doc) => getDocumentKind(doc) === 'pdf').length;
   const imageCount = docs.filter((doc) => getDocumentKind(doc) === 'image').length;
@@ -1005,7 +1007,7 @@ async function loadDocuments() {
   const actionableUnsorted = docsWithSuggestion.filter((doc) => isActionableUnsortedDocument(doc));
   const suggestionBuckets = buildSuggestedDocumentBuckets(docsWithSuggestion);
   const currentBuckets = buildCurrentDocumentBuckets(docsWithSuggestion);
-  const inWorkbench = scopedToSelected && isProjectDocsWorkbench(selectedProductName());
+  const inWorkbench = isDocumentScopeSelected() && isProjectDocsWorkbench(selectedProductName());
   const visibleDocs = getVisibleDocumentsForCurrentView(docs);
 
   el.innerHTML = '';
@@ -1168,9 +1170,7 @@ async function loadDocuments() {
 }
 
 async function moveAllSuggestedDocuments() {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const candidates = docs
     .map((doc) => ({ doc, suggestion: suggestDocumentTarget(doc) }))
     .filter((item) => !isDeferredDocument(item.doc.id) && item.suggestion && Number(item.suggestion.productId) !== Number(item.doc.product_id));
@@ -1202,9 +1202,7 @@ async function moveAllSuggestedDocuments() {
 }
 
 async function moveVisibleSuggestedDocuments() {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const visibleDocs = getVisibleDocumentsForCurrentView(docs)
     .filter((doc) => isActionableSuggestedDocument(doc));
 
@@ -1235,9 +1233,7 @@ async function moveVisibleSuggestedDocuments() {
 }
 
 async function copyVisibleDocumentsList() {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const visibleDocs = getVisibleDocumentsForCurrentView(docs);
 
   if (!visibleDocs.length) {
@@ -1267,12 +1263,10 @@ async function moveAllUnsortedDocuments() {
     return;
   }
 
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const candidates = docs
     .map((doc) => ({ doc, suggestion: suggestDocumentTarget(doc) }))
-    .filter((item) => !item.suggestion && Number(item.doc.product_id) !== Number(targetProductId));
+    .filter((item) => !isDeferredDocument(item.doc.id) && !item.suggestion && Number(item.doc.product_id) !== Number(targetProductId));
 
   if (!candidates.length) {
     setDocumentStatus('Zadne dokumenty bez navrhu k zarazeni.', 'ok');
@@ -1312,11 +1306,9 @@ async function moveVisibleDocumentsToTarget() {
     return;
   }
 
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const visibleDocs = getVisibleDocumentsForCurrentView(docs)
-    .filter((doc) => Number(doc.product_id) !== Number(targetProductId));
+    .filter((doc) => !isDeferredDocument(doc.id) && Number(doc.product_id) !== Number(targetProductId));
 
   if (!visibleDocs.length) {
     setDocumentStatus('Zadne viditelne dokumenty k zarazeni.', 'ok');
@@ -1347,12 +1339,10 @@ async function moveVisibleDocumentsToTarget() {
 }
 
 async function moveSuggestedDocumentsToProduct(productId, productName) {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const candidates = docs
     .map((doc) => ({ doc, suggestion: suggestDocumentTarget(doc) }))
-    .filter((item) => item.suggestion && Number(item.suggestion.productId) === Number(productId) && Number(item.doc.product_id) !== Number(productId));
+    .filter((item) => !isDeferredDocument(item.doc.id) && item.suggestion && Number(item.suggestion.productId) === Number(productId) && Number(item.doc.product_id) !== Number(productId));
 
   if (!candidates.length) {
     setDocumentStatus(`Zadne dokumenty k presunu do ${productName}.`, 'ok');
@@ -1386,9 +1376,7 @@ async function openSuggestedProduct(productId, productName) {
 }
 
 async function openNextSuggestedDocument() {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
     .find((doc) => isActionableSuggestedDocument(doc));
@@ -1406,9 +1394,7 @@ async function openNextSuggestedDocument() {
 }
 
 async function openNextUnsortedDocument() {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
     .find((doc) => isActionableUnsortedDocument(doc));
@@ -1426,9 +1412,7 @@ async function openNextUnsortedDocument() {
 }
 
 async function moveNextSuggestedDocument() {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
     .find((doc) => isActionableSuggestedDocument(doc));
@@ -1447,9 +1431,7 @@ async function moveNextUnsortedDocumentToLastTarget() {
     return;
   }
 
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
     .find((doc) => isActionableUnsortedDocument(doc));
@@ -1476,9 +1458,7 @@ async function moveNextUnsortedDocumentToLastTarget() {
 }
 
 async function deferNextActionableDocument() {
-  const scopedToSelected = documentScope === 'selected' && selectedProductId;
-  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
-  const docs = await apiGet(path);
+  const docs = await apiGet(getDocumentScopePath());
   const candidate = docs
     .map((doc) => ({ ...doc, _suggestion: suggestDocumentTarget(doc) }))
     .find((doc) => isActionableSuggestedDocument(doc) || isActionableUnsortedDocument(doc));

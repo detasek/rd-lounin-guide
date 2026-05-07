@@ -743,3 +743,26 @@ Nasadit po tomto checkpointu:
 - `app/app.js`
 - `app/index.html`
 - `docs/current-state.md`
+
+---
+
+## STAGE B.3 - TARGETED CLEANUP / REVIEW (2026-05-07)
+
+Lokalni cleanup:
+- Odstraneny trackovane historicke backup artefakty z aktivnich slozek:
+  - `api/controllers/receiptsController.js.bak_batch_watcher`
+  - `api/routes/products.js.bak2`
+  - `api/routes/products.js.bak3`
+  - `api/server.core.backup.js`
+  - `docs/current-state.md.bak_after_watch_video`
+  - `docs/current-state.md.bak_watch_video`
+- Document triage refaktor:
+  - pridany helper `isDocumentScopeSelected()`
+  - pridany helper `getDocumentScopePath()`
+  - batch/next triage akce pouzivaji jednotny scope path
+  - odlozene dokumenty jsou preskoceny i ve starsich batch akcich `Zaradit vse bez navrhu`, `Zaradit viditelne`, `Presunout sem X`
+
+Nasadit po tomto checkpointu:
+- `app/app.js`
+- `docs/current-state.md`
+- odstranit vyse uvedene backup soubory z NAS workspace, pokud tam existuji
