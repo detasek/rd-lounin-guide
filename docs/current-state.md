@@ -1084,3 +1084,55 @@ Ověřeno lokálně:
 - `api/routes/diary.js` syntax check
 - `api/app.js` syntax check
 - `scripts/smoke-check.js`
+
+---
+
+## SECURITY / AUTH CHECKPOINT (2026-05-07)
+
+Lokální bezpečnostní rozšíření:
+- Hesla a PIN nejsou ukládána čitelně:
+  - backend používá PBKDF2-SHA256
+  - každý secret má vlastní sůl
+  - ověření používá timing-safe porovnání
+- Uživatel má nově e-mail:
+  - e-mail je povinný při založení účtu
+  - login funguje přes uživatelské jméno nebo e-mail
+  - e-mail se ukládá do `users.email`
+- E-mailové ověření účtu:
+  - `POST /api/auth/verify-email`
+  - token je v DB uložený pouze jako SHA-256 hash
+  - token expiruje po 24 hodinách
+- Obnova hesla:
+  - `POST /api/auth/password-reset/request`
+  - `POST /api/auth/password-reset/confirm`
+  - reset token je v DB uložený pouze jako SHA-256 hash
+  - po změně hesla se smažou existující sessions uživatele
+  - uživateli se odešle informační e-mail o změně hesla
+- E-mailové odesílání:
+  - `api/services/mailService.js`
+  - konfigurace přes `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+  - veřejná URL přes `APP_PUBLIC_URL`
+  - když SMTP není nastavené, zpráva se zapíše do backend logu jako `[mail:fallback]`
+- UI:
+  - přidán e-mail do registrace
+  - přidána obnova hesla
+  - přidán reset hesla z URL tokenu
+  - uživatelský panel ukazuje e-mail a stav ověření
+- Sekční nápovědy:
+  - Stavební okruhy
+  - Dokumenty
+  - Faktury / účtenky
+  - Rozpočet
+  - Média
+  - Deník
+
+Lokální DB kontrola:
+- `data/db.sqlite` a `data/database.sqlite` lokálně nemají tabulku `users`, takže účet `černý / douglas elektro` v lokální DB nebyl nalezen.
+- Produkční smazání účtu je potřeba udělat na Synology DB, kde účet reálně vznikl.
+
+Ověřeno lokálně:
+- `app/app.js` syntax check
+- `api/routes/auth.js` syntax check
+- `api/services/mailService.js` syntax check
+- `api/app.js` syntax check
+- `scripts/smoke-check.js`

@@ -26,11 +26,13 @@
         <input id="authName" autocomplete="name" placeholder="Jméno uživatele">
         <label for="authSetupUsername">Uživatelské jméno</label>
         <input id="authSetupUsername" autocomplete="username" placeholder="např. detasek">
+        <label for="authSetupEmail">E-mail pro ověření a obnovu hesla</label>
+        <input id="authSetupEmail" type="email" autocomplete="email" placeholder="jmeno@example.cz">
         <label for="authSetupPassword">Heslo</label>
         <input id="authSetupPassword" type="password" autocomplete="new-password" placeholder="min. 6 znaků">
         <label for="authSetupPin">PIN</label>
         <input id="authSetupPin" type="password" inputmode="numeric" autocomplete="off" placeholder="volitelně">
-        <button type="button" onclick="setupFirstUser()">Vytvořit a přihlásit</button>
+        <button type="button" id="authSetupSubmit" onclick="setupFirstUser()">Vytvořit a přihlásit</button>
       </div>
       <div id="authLoginPanel" hidden>
         <h2>Přihlášení</h2>
@@ -42,7 +44,25 @@
         <label for="authLoginPin">PIN</label>
         <input id="authLoginPin" type="password" inputmode="numeric" autocomplete="off">
         <button type="button" onclick="loginUser()">Přihlásit</button>
+        <button type="button" class="ghost-btn auth-alt-action" onclick="showAuthMode('reset')">Zapomenuté heslo</button>
         <button type="button" class="ghost-btn auth-alt-action" onclick="showAuthMode('setup')">Vytvořit nový účet</button>
+      </div>
+      <div id="authResetPanel" hidden>
+        <h2>Obnova hesla</h2>
+        <p class="muted">Zadej uživatelské jméno nebo e-mail. Pokud účet existuje, pošleme odkaz pro obnovu.</p>
+        <button type="button" class="ghost-btn auth-back-action" onclick="showAuthMode('login')">← Zpět na přihlášení</button>
+        <label for="authResetLogin">Login nebo e-mail</label>
+        <input id="authResetLogin" autocomplete="username email">
+        <button type="button" onclick="requestPasswordReset()">Poslat odkaz</button>
+      </div>
+      <div id="authResetConfirmPanel" hidden>
+        <h2>Nastavení nového hesla</h2>
+        <p class="muted">Zadej nové heslo. Volitelně můžeš rovnou nastavit nový PIN.</p>
+        <label for="authResetPassword">Nové heslo</label>
+        <input id="authResetPassword" type="password" autocomplete="new-password" placeholder="min. 6 znaků">
+        <label for="authResetPin">Nový PIN</label>
+        <input id="authResetPin" type="password" inputmode="numeric" autocomplete="off" placeholder="volitelně">
+        <button type="button" onclick="confirmPasswordReset()">Uložit nové heslo</button>
       </div>
     </div>
   </div>
@@ -117,6 +137,7 @@
             <div>
               <p class="eyebrow">Průvodce stavbou</p>
               <h2>Stavební okruhy</h2>
+              <details class="section-help"><summary>Nápověda k sekci</summary><ul><li>Stavební okruh je část stavby, například základová deska, zdivo, střecha nebo FVE.</li><li>K okruhu se vážou dokumenty, faktury, média, deníkové zápisy a rozpočet.</li><li>Klik na řádek nastaví aktivní okruh pro další práci.</li><li>Rychlý start založí doporučenou kostru okruhů podle RD Lounín.</li></ul></details>
             </div>
           </div>
           <div class="split-grid">
@@ -144,6 +165,7 @@
               <p class="eyebrow">Triage a dokumentace</p>
               <h2>Dokumenty</h2>
               <div id="documentSummary" class="muted">Dokumenty: -</div>
+              <details class="section-help"><summary>Nápověda k sekci</summary><ul><li>Sem patří projektová dokumentace, nabídky, technické listy, výkresy a další soubory.</li><li>Dokument se ukládá k vybranému stavebnímu okruhu.</li><li>Staging/workbench je dočasné místo pro hromadné třídění dokumentace.</li><li>Doporučené přesuny jsou odhad podle názvu souboru a cesty; finální zařazení potvrzuješ ručně.</li></ul></details>
             </div>
             <div id="documentStatus" class="muted">Připraveno.</div>
           </div>
@@ -209,6 +231,7 @@
               <p class="eyebrow">Záruky a doklady</p>
               <h2>Faktury / účtenky</h2>
               <div id="receiptSelectedProduct" class="muted">Produkt: vše</div>
+              <details class="section-help"><summary>Nápověda k sekci</summary><ul><li>Faktury a účtenky se ukládají k vybranému stavebnímu okruhu.</li><li>Datum nákupu / převzetí je rozhodné pro výpočet záruky.</li><li>OCR návrh je dočasný pomocník; zatím nečte plný obsah PDF jako účetní systém.</li><li>Schválit OCR znamená potvrdit nalezené údaje a zavřít položku z kontroly.</li></ul></details>
             </div>
             <div id="receiptStatus" class="muted" aria-live="polite"></div>
           </div>
@@ -236,6 +259,7 @@
               <p class="eyebrow">Finance stavby</p>
               <h2>Rozpočet</h2>
               <div id="budgetSummary" class="muted">Plán, faktury, čerpání a disponibilní částka.</div>
+              <details class="section-help"><summary>Nápověda k sekci</summary><ul><li>Rozpočet porovnává plánovanou částku okruhu s fakturami přiřazenými ke stejnému okruhu.</li><li>Zelený progress znamená čerpání v limitu, červený překročení rozpočtu.</li><li>Uzavření okruhu uloží kladný zůstatek do disponibilní částky.</li><li>Import Excelu doplníme nad reálným rozpočtem, aby se správně namapovaly sloupce.</li></ul></details>
             </div>
             <div id="budgetStatus" class="muted">Připraveno.</div>
           </div>
@@ -251,6 +275,7 @@
               <p class="eyebrow">Fotodokumentace</p>
               <h2>Média</h2>
               <div id="photoSummary" class="muted">Media summary: -</div>
+              <details class="section-help"><summary>Nápověda k sekci</summary><ul><li>Média ukládají fotky, videa a další soubory k vybranému stavebnímu okruhu.</li><li>Watch folder je složka na NAS, kam můžeš rychle nakopírovat soubory z telefonu nebo PC.</li><li>Import z inboxu soubor přesune do evidence a propojí ho s okruhem.</li></ul></details>
             </div>
             <div id="photoStatus" class="muted" aria-live="polite"></div>
           </div>
@@ -282,6 +307,7 @@
               <p class="eyebrow">Stavební deník</p>
               <h2>Deník</h2>
               <div class="muted">Rychlý zápis k produktu nebo fázi.</div>
+              <details class="section-help"><summary>Nápověda k sekci</summary><ul><li>Deník eviduje datum, čas od-do, počasí, teplotu, provedené práce a stavební dozor.</li><li>Počasí a teplota se doplňují automaticky podle data a časového intervalu.</li><li>Ke každému zápisu můžeš přidat fotky nebo videa.</li><li>Kalendář ukazuje žlutou tečku pro zápis a barevnou tečku pro výsledek stavebního dozoru.</li></ul></details>
             </div>
             <div id="diaryStatus" class="muted" aria-live="polite"></div>
           </div>

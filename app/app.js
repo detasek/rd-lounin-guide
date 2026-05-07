@@ -57,6 +57,7 @@ let diaryCalendarYear = new Date().getFullYear();
 let diaryCalendarMonth = new Date().getMonth();
 let lastDiaryEntries = [];
 let editingDiaryId = null;
+let pendingPasswordResetToken = '';
 
 function closestAppSection(element) {
   return element ? element.closest('section[id]') : null;
@@ -316,13 +317,17 @@ function showAuthMode(mode) {
   const appShell = document.getElementById('appShell');
   const setupPanel = document.getElementById('authSetupPanel');
   const loginPanel = document.getElementById('authLoginPanel');
+  const resetPanel = document.getElementById('authResetPanel');
+  const resetConfirmPanel = document.getElementById('authResetConfirmPanel');
   if (authView) authView.hidden = false;
   if (appShell) appShell.hidden = true;
   if (setupPanel) setupPanel.hidden = mode !== 'setup';
   if (loginPanel) loginPanel.hidden = mode !== 'login';
+  if (resetPanel) resetPanel.hidden = mode !== 'reset';
+  if (resetConfirmPanel) resetConfirmPanel.hidden = mode !== 'reset-confirm';
   const setupTitle = setupPanel?.querySelector('h2');
   const setupText = setupPanel?.querySelector('p');
-  const setupButton = setupPanel?.querySelector('button');
+  const setupButton = document.getElementById('authSetupSubmit');
   if (setupTitle) setupTitle.textContent = mode === 'setup' && currentUser === null ? 'Vytvořit účet' : 'První spuštění';
   if (setupText) setupText.textContent = 'Vytvoř uživatele. PIN bude sloužit pro rychlé přihlášení.';
   if (setupButton) setupButton.textContent = 'Vytvořit a přihlásit';
@@ -330,11 +335,13 @@ function showAuthMode(mode) {
 
 function friendlyAuthError(error) {
   const message = String(error?.message || error || '');
-  if (message.includes('username_exists')) return 'Uživatel s tímto loginem už existuje. Zvol jiné uživatelské jméno, nebo se přihlas.';
+  if (message.includes('username_exists') || message.includes('login_or_email_exists')) return 'Uživatel s tímto loginem nebo e-mailem už existuje. Zvol jiné údaje, nebo se přihlas.';
   if (message.includes('setup_already_done')) return 'První účet už existuje. Přepni se zpět na přihlášení a použij svůj login, heslo nebo PIN.';
-  if (message.includes('invalid_registration') || message.includes('invalid_setup')) return 'Vyplň jméno, uživatelské jméno a heslo alespoň 6 znaků.';
+  if (message.includes('invalid_registration') || message.includes('invalid_setup')) return 'Vyplň jméno, uživatelské jméno, platný e-mail a heslo alespoň 6 znaků.';
   if (message.includes('invalid_credentials')) return 'Nesedí uživatelské jméno, heslo nebo PIN.';
   if (message.includes('credentials_required')) return 'Vyplň uživatelské jméno a heslo, nebo PIN.';
+  if (message.includes('invalid_or_expired_token')) return 'Odkaz je neplatný nebo už vypršel. Požádej o nový odkaz.';
+  if (message.includes('invalid_password_reset')) return 'Vyplň nové heslo alespoň 6 znaků.';
   return `Nepovedlo se dokončit akci: ${message}`;
 }
 
@@ -362,6 +369,10 @@ function persistAuth(token, user) {
 }
 
 async function initAuth() {
+  const params = new URLSearchParams(window.location.search || '');
+  pendingPasswordResetToken = params.get('reset_password_token') || '';
+  const verifyEmailToken = params.get('verify_email_token') || '';
+
   try {
     authToken = window.localStorage.getItem(AUTH_TOKEN_KEY) || '';
   } catch (_) {
@@ -380,6 +391,22 @@ async function initAuth() {
   if (bootstrap.needs_setup) {
     setAuthStatus('Vytvoř prvního uživatele.', 'ok');
     showAuthMode('setup');
+    return false;
+  }
+
+  if (verifyEmailToken) {
+    try {
+      await apiPost('/auth/verify-email', { token: verifyEmailToken });
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setAuthStatus('E-mail ověřen. Teď se můžeš přihlásit.', 'ok');
+    } catch (e) {
+      setAuthStatus(friendlyAuthError(e), 'miss');
+    }
+  }
+
+  if (pendingPasswordResetToken) {
+    showAuthMode('reset-confirm');
+    setAuthStatus('Zadej nové heslo.', 'ok');
     return false;
   }
 
@@ -409,12 +436,45 @@ async function setupFirstUser() {
     const payload = await apiPost(bootstrap.needs_setup ? '/auth/setup' : '/auth/register', {
       name: document.getElementById('authName').value.trim(),
       username: document.getElementById('authSetupUsername').value.trim(),
+      email: document.getElementById('authSetupEmail').value.trim(),
       password: document.getElementById('authSetupPassword').value,
       pin: document.getElementById('authSetupPin').value
     });
     persistAuth(payload.token, payload.user);
     showApplication();
     await bootApplication();
+  } catch (e) {
+    const message = friendlyAuthError(e);
+    setAuthStatus(message, 'miss');
+    alert(message);
+  }
+}
+
+async function requestPasswordReset() {
+  try {
+    await apiPost('/auth/password-reset/request', {
+      login: document.getElementById('authResetLogin').value.trim()
+    });
+    setAuthStatus('Pokud účet existuje, odkaz pro obnovu hesla byl odeslán na e-mail.', 'ok');
+    showAuthMode('login');
+  } catch (e) {
+    const message = friendlyAuthError(e);
+    setAuthStatus(message, 'miss');
+    alert(message);
+  }
+}
+
+async function confirmPasswordReset() {
+  try {
+    await apiPost('/auth/password-reset/confirm', {
+      token: pendingPasswordResetToken,
+      password: document.getElementById('authResetPassword').value,
+      pin: document.getElementById('authResetPin').value
+    });
+    pendingPasswordResetToken = '';
+    window.history.replaceState({}, document.title, window.location.pathname);
+    setAuthStatus('Heslo změněno. Přihlas se novým heslem.', 'ok');
+    showAuthMode('login');
   } catch (e) {
     const message = friendlyAuthError(e);
     setAuthStatus(message, 'miss');
@@ -453,7 +513,7 @@ function openUserPanel() {
   const content = document.getElementById('userPanelContent');
   if (content) {
     content.innerHTML = currentUser
-      ? `<b>${esc(currentUser.name || '-')}</b><br><small>Uživatel: ${esc(currentUser.username || '-')} | ID: ${esc(currentUser.id)}</small><br><small>PIN a Face ID rozšíříme v další iteraci.</small>`
+      ? `<b>${esc(currentUser.name || '-')}</b><br><small>Login: ${esc(currentUser.username || '-')} | E-mail: ${esc(currentUser.email || '-')} | ověřen: ${currentUser.email_verified ? 'ano' : 'ne'} | ID: ${esc(currentUser.id)}</small><br><small>Hesla a PIN jsou uložené jako salted PBKDF2 hash. Obnova hesla probíhá přes jednorázový e-mailový token.</small>`
       : 'Uživatel není načten.';
   }
   if (panel) panel.hidden = false;
