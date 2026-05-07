@@ -708,6 +708,23 @@ async function undeferDocument(docId) {
   setDocumentStatus(`Dokument #${docId} vracen do fronty.`, 'ok');
 }
 
+async function undeferAllVisibleDocuments() {
+  const scopedToSelected = documentScope === 'selected' && selectedProductId;
+  const path = scopedToSelected ? `/documents?product_id=${selectedProductId}` : '/documents';
+  const docs = await apiGet(path);
+  const visibleDeferredDocs = getVisibleDocumentsForCurrentView(docs)
+    .filter((doc) => isDeferredDocument(doc.id));
+
+  if (!visibleDeferredDocs.length) {
+    setDocumentStatus('Zadne viditelne odlozene dokumenty k vraceni.', 'ok');
+    return;
+  }
+
+  visibleDeferredDocs.forEach((doc) => undeferDocumentId(doc.id));
+  await loadDocuments();
+  setDocumentStatus(`Vraceno do fronty: ${visibleDeferredDocs.length}.`, 'ok');
+}
+
 async function focusProductDocuments(productId, filter = 'all') {
   selectedProductId = Number(productId);
   documentScope = 'selected';
@@ -1014,6 +1031,7 @@ async function loadDocuments() {
             <button type="button" class="ghost-btn" onclick="moveNextSuggestedDocument()">Presunout dalsi doporuceny</button>
             <button type="button" class="ghost-btn" onclick="moveNextUnsortedDocumentToLastTarget()">Zaradit dalsi bez navrhu do posledniho cile</button>
             <button type="button" class="ghost-btn" onclick="deferNextActionableDocument()">Odlozit dalsi k reseni</button>
+            <button type="button" class="ghost-btn" onclick="undeferAllVisibleDocuments()">Vratit viditelne odlozene</button>
           </div>
         </div>
       `;
