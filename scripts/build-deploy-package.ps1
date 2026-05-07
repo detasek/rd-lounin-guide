@@ -52,11 +52,12 @@ foreach ($file in $Files) {
 }
 
 $IndexPath = Join-Path $StageDir "app\index.html"
-$IndexHtml = Get-Content -LiteralPath $IndexPath -Raw
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$IndexHtml = [System.IO.File]::ReadAllText($IndexPath, [System.Text.Encoding]::UTF8)
 $IndexHtml = $IndexHtml -replace 'styles\.css\?v=[^"]+', "styles.css?v=$Commit"
 $IndexHtml = $IndexHtml -replace 'config\.js\?v=[^"]+', "config.js?v=$Commit"
 $IndexHtml = $IndexHtml -replace 'app\.js\?v=[^"]+', "app.js?v=$Commit"
-Set-Content -Path $IndexPath -Value $IndexHtml -Encoding UTF8
+[System.IO.File]::WriteAllText($IndexPath, $IndexHtml, $Utf8NoBom)
 
 $RemovePatterns = @(
   ".git",

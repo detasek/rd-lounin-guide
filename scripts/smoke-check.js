@@ -81,6 +81,7 @@ function checkFrontendFiles() {
 function checkDriftSignals() {
   const trackedLikeFiles = walk(root)
     .filter((file) => !file.rel.startsWith('data/'))
+    .filter((file) => !file.rel.startsWith('deploy/'))
     .filter((file) => !file.rel.startsWith('node_modules/'))
     .filter((file) => !file.rel.startsWith('api/node_modules/'))
     .filter((file) => !file.rel.startsWith('.git/'));
