@@ -397,6 +397,32 @@ body.theme-dark .metric-card {
   margin-top: 4px;
 }
 
+.admin-user-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.admin-user-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.admin-user-row small {
+  display: block;
+  color: var(--muted);
+}
+
+.admin-user-row select {
+  margin: 0;
+}
+
 input,
 textarea,
 select {
@@ -1189,6 +1215,7 @@ body.compact-mode .panel {
 
   .product-row,
   .document-title-row,
+  .admin-user-row,
   .receipt-head {
     grid-template-columns: 1fr;
   }

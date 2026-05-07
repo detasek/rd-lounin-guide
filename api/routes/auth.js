@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const db = require('../db/db');
 const { sendMail, verificationUrl, resetUrl } = require('../services/mailService');
+const { ROLE_PERMISSIONS, permissionsForRole } = require('../middleware/accessControl');
 
 const router = express.Router();
 const HASH_ITERATIONS = 120000;
@@ -40,7 +41,8 @@ db.serialize(() => {
     ['email_verify_expires_at', 'DATETIME'],
     ['password_reset_token_hash', 'TEXT'],
     ['password_reset_expires_at', 'DATETIME'],
-    ['password_changed_at', 'DATETIME']
+    ['password_changed_at', 'DATETIME'],
+    ['role', "TEXT DEFAULT 'admin'"]
   ].forEach(([column, definition]) => {
     db.run(`ALTER TABLE users ADD COLUMN ${column} ${definition}`, (err) => {
       if (err && !String(err.message || '').includes('duplicate column name')) {
@@ -50,6 +52,7 @@ db.serialize(() => {
   });
 
   db.run(`CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users(email) WHERE email IS NOT NULL`);
+  db.run(`UPDATE users SET role = 'admin' WHERE role IS NULL OR role = ''`);
 });
 
 function hashSecret(secret, salt = crypto.randomBytes(16).toString('hex')) {
@@ -67,12 +70,15 @@ function verifySecret(secret, hash, salt) {
 
 function publicUser(row) {
   if (!row) return null;
+  const role = row.role || 'guest';
   return {
     id: row.id,
     name: row.name,
     username: row.username,
     email: row.email || null,
     email_verified: Boolean(row.email_verified_at),
+    role,
+    permissions: permissionsForRole(role),
     created_at: row.created_at
   };
 }
@@ -199,10 +205,10 @@ router.post('/setup', (req, res) => {
 
     db.run(
       `
-        INSERT INTO users (name, username, email, password_hash, password_salt, pin_hash, pin_salt, email_verify_token_hash, email_verify_expires_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (name, username, email, password_hash, password_salt, pin_hash, pin_salt, email_verify_token_hash, email_verify_expires_at, role)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [name, username, email, passwordHash.hash, passwordHash.salt, pinHash.hash, pinHash.salt, hashToken(verifyToken), tokenExpiry()],
+      [name, username, email, passwordHash.hash, passwordHash.salt, pinHash.hash, pinHash.salt, hashToken(verifyToken), tokenExpiry(), 'admin'],
       function (insertErr) {
         if (insertErr) return res.status(500).json({ error: insertErr.message });
 
@@ -237,10 +243,10 @@ router.post('/register', (req, res) => {
 
   db.run(
     `
-      INSERT INTO users (name, username, email, password_hash, password_salt, pin_hash, pin_salt, email_verify_token_hash, email_verify_expires_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (name, username, email, password_hash, password_salt, pin_hash, pin_salt, email_verify_token_hash, email_verify_expires_at, role)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
-    [name, username, email, passwordHash.hash, passwordHash.salt, pinHash.hash, pinHash.salt, hashToken(verifyToken), tokenExpiry()],
+    [name, username, email, passwordHash.hash, passwordHash.salt, pinHash.hash, pinHash.salt, hashToken(verifyToken), tokenExpiry(), 'guest'],
     function (insertErr) {
       if (insertErr) {
         if (String(insertErr.message || '').includes('UNIQUE')) {
@@ -290,6 +296,48 @@ router.post('/login', (req, res) => {
 
 router.get('/me', requireSession, (req, res) => {
   res.json({ user: req.user });
+});
+
+function requireAdmin(req, res, next) {
+  requireSession(req, res, () => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'admin_required' });
+    next();
+  });
+}
+
+router.get('/roles', requireSession, (_req, res) => {
+  res.json({ roles: ROLE_PERMISSIONS });
+});
+
+router.get('/users', requireAdmin, (_req, res) => {
+  db.all(
+    `SELECT id, name, username, email, email_verified_at, role, created_at, updated_at FROM users ORDER BY id ASC`,
+    [],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json((rows || []).map(publicUser));
+    }
+  );
+});
+
+router.put('/users/:id/role', requireAdmin, (req, res) => {
+  const userId = Number(req.params.id);
+  const role = String(req.body?.role || '').trim();
+  if (!Number.isInteger(userId) || !ROLE_PERMISSIONS[role]) return res.status(400).json({ error: 'invalid_role' });
+
+  if (Number(req.user.id) === userId && role !== 'admin') {
+    return res.status(400).json({ error: 'cannot_demote_self' });
+  }
+
+  db.run(
+    `UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [role, userId],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!this.changes) return res.status(404).json({ error: 'user_not_found' });
+      res.json({ success: true });
+    }
+  );
 });
 
 router.post('/verify-email', (req, res) => {

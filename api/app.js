@@ -12,6 +12,7 @@ const logger = require('./middleware/logger');
 const response = require('./middleware/response');
 const security = require('./middleware/security');
 const errorHandler = require('./middleware/errorHandler');
+const { requireAccess } = require('./middleware/accessControl');
 const { UPLOADS_DIR, RECEIPTS_DIR } = require('./lib/runtimePaths');
 
 const app = express();
@@ -40,9 +41,10 @@ app.use('/files', express.static(UPLOADS_DIR, staticOptions));
 app.use('/api', require('./routes/status'));    // GET /api/status
 app.use('/api', require('./routes/lookups'));   // GET /api/phases, /api/rooms
 app.use('/api', require('./routes/qr'));        // GET /api/qr
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api', requireAccess);
 app.use('/api', require('./routes/diary'));     // GET/POST /api/diary
 app.use('/api', require('./routes/watcher'));   // GET /api/watcher
-app.use('/api/auth', require('./routes/auth'));
 app.use('/api/watch-folder', require('./routes/watchFolder'));
 app.use('/api/products',  require('./routes/products'));
 app.use('/api/documents', require('./routes/documents'));

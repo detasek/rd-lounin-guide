@@ -217,6 +217,13 @@ function formatMoney(value) {
   }).format(Number(value || 0));
 }
 
+function roleLabel(role) {
+  if (role === 'admin') return 'Správce';
+  if (role === 'user') return 'Uživatel';
+  if (role === 'guest') return 'Guest';
+  return role || '-';
+}
+
 async function copyText(value, successMessage = 'Zkopirovano.') {
   const text = String(value || '');
   if (!text) return;
@@ -342,7 +349,59 @@ function friendlyAuthError(error) {
   if (message.includes('credentials_required')) return 'Vyplň uživatelské jméno a heslo, nebo PIN.';
   if (message.includes('invalid_or_expired_token')) return 'Odkaz je neplatný nebo už vypršel. Požádej o nový odkaz.';
   if (message.includes('invalid_password_reset')) return 'Vyplň nové heslo alespoň 6 znaků.';
+  if (message.includes('admin_required')) return 'Tuhle akci může udělat jen správce.';
+  if (message.includes('cannot_demote_self')) return 'Nemůžeš odebrat správcovská práva sám sobě.';
+  if (message.includes('write_forbidden')) return 'Guest má jen čtení a nemůže zapisovat.';
+  if (message.includes('system_write_forbidden')) return 'Tahle změna patří do správy systému a může ji udělat jen správce.';
+  if (message.includes('section_forbidden')) return 'Tvoje role nemá přístup k této sekci.';
   return `Nepovedlo se dokončit akci: ${message}`;
+}
+
+function currentPermissions() {
+  return currentUser?.permissions || { can_read: true, can_write: false, can_manage_system: false, sections: [] };
+}
+
+function canWrite() {
+  return Boolean(currentPermissions().can_write);
+}
+
+function canManageSystem() {
+  return Boolean(currentPermissions().can_manage_system);
+}
+
+function canSeeSection(sectionKey) {
+  return currentPermissions().sections?.includes(sectionKey);
+}
+
+function applyPermissionsToUi() {
+  const sectionMap = {
+    productsSection: 'products',
+    documentsSection: 'documents',
+    receiptsSection: 'receipts',
+    budgetSection: 'budget',
+    mediaSection: 'media',
+    diarySection: 'diary',
+    watcherSection: 'watcher'
+  };
+
+  Object.entries(sectionMap).forEach(([sectionId, permission]) => {
+    const visible = canSeeSection(permission);
+    const section = document.getElementById(sectionId);
+    if (section) section.hidden = !visible;
+    document.querySelectorAll(`.nav-link[data-section="${sectionId}"]`).forEach((button) => {
+      button.hidden = !visible;
+    });
+  });
+
+  document.querySelectorAll('[data-requires-write]').forEach((el) => {
+    el.disabled = !canWrite();
+    el.title = canWrite() ? (el.title || '') : 'Tvoje role má jen čtení.';
+  });
+
+  document.querySelectorAll('[data-requires-admin]').forEach((el) => {
+    el.disabled = !canManageSystem();
+    el.title = canManageSystem() ? (el.title || '') : 'Tuhle akci může udělat jen správce.';
+  });
 }
 
 function toggleHeaderOverview() {
@@ -356,7 +415,8 @@ function showApplication() {
   if (authView) authView.hidden = true;
   if (appShell) appShell.hidden = false;
   const userButton = document.getElementById('userButton');
-  if (userButton && currentUser) userButton.textContent = currentUser.name || currentUser.username || 'Uživatel';
+  if (userButton && currentUser) userButton.textContent = `${currentUser.name || currentUser.username || 'Uživatel'} · ${roleLabel(currentUser.role)}`;
+  applyPermissionsToUi();
 }
 
 function persistAuth(token, user) {
@@ -513,15 +573,59 @@ function openUserPanel() {
   const content = document.getElementById('userPanelContent');
   if (content) {
     content.innerHTML = currentUser
-      ? `<b>${esc(currentUser.name || '-')}</b><br><small>Login: ${esc(currentUser.username || '-')} | E-mail: ${esc(currentUser.email || '-')} | ověřen: ${currentUser.email_verified ? 'ano' : 'ne'} | ID: ${esc(currentUser.id)}</small><br><small>Hesla a PIN jsou uložené jako salted PBKDF2 hash. Obnova hesla probíhá přes jednorázový e-mailový token.</small>`
+      ? `
+        <b>${esc(currentUser.name || '-')}</b>
+        <br><small>Login: ${esc(currentUser.username || '-')} | role: ${esc(roleLabel(currentUser.role))} | E-mail: ${esc(currentUser.email || '-')} | ověřen: ${currentUser.email_verified ? 'ano' : 'ne'} | ID: ${esc(currentUser.id)}</small>
+        <br><small>Hesla a PIN jsou uložené jako salted PBKDF2 hash. Obnova hesla probíhá přes jednorázový e-mailový token.</small>
+        ${canManageSystem() ? '<div id="adminUsersPanel" class="subsection">Načítám správu uživatelů...</div>' : ''}
+      `
       : 'Uživatel není načten.';
   }
   if (panel) panel.hidden = false;
+  if (canManageSystem()) loadAdminUsers();
 }
 
 function closeUserPanel() {
   const panel = document.getElementById('userPanel');
   if (panel) panel.hidden = true;
+}
+
+async function loadAdminUsers() {
+  const el = document.getElementById('adminUsersPanel');
+  if (!el) return;
+  try {
+    const users = await apiGet('/auth/users');
+    el.innerHTML = `
+      <h3>Správa uživatelů a práv</h3>
+      <div class="muted">Správce může vše, uživatel může číst a zapisovat obsah bez systémových změn, guest jen nahlíží.</div>
+      <div class="admin-user-list">
+        ${users.map((user) => `
+          <div class="admin-user-row">
+            <div>
+              <b>${esc(user.name || user.username)}</b>
+              <small>${esc(user.username || '-')} | ${esc(user.email || '-')} | ověřen: ${user.email_verified ? 'ano' : 'ne'}</small>
+            </div>
+            <select id="user-role-${user.id}" ${Number(user.id) === Number(currentUser?.id) ? 'disabled title="Vlastní roli neměň tady."' : ''}>
+              ${['admin', 'user', 'guest'].map((role) => `<option value="${role}" ${user.role === role ? 'selected' : ''}>${roleLabel(role)}</option>`).join('')}
+            </select>
+            <button type="button" class="ghost-btn" ${Number(user.id) === Number(currentUser?.id) ? 'disabled' : ''} onclick="saveUserRole(${user.id})">Uložit práva</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<div class="muted status-miss">MISS uživatelé: ${esc(friendlyAuthError(e))}</div>`;
+  }
+}
+
+async function saveUserRole(userId) {
+  const role = document.getElementById(`user-role-${userId}`)?.value;
+  try {
+    await apiPut(`/auth/users/${userId}/role`, { role });
+    await loadAdminUsers();
+  } catch (e) {
+    alert(friendlyAuthError(e));
+  }
 }
 
 function selectedProductName() {
@@ -3332,23 +3436,23 @@ async function bootApplication() {
   });
 
   await runBootStep('API status', bootStatus);
-  await runBootStep('produkty', loadProducts, (error) => {
+  if (canSeeSection('products')) await runBootStep('produkty', loadProducts, (error) => {
     const el = document.getElementById('productsList');
     if (el) el.innerHTML = `<div class="muted status-miss">MISS: ${esc(error.message)}</div>`;
   });
-  await runBootStep('dokumenty', loadDocuments, (error) => setDocumentStatus(`MISS: ${error.message}`, 'miss'));
-  await runBootStep('media', loadPhotos, (error) => setPhotoStatus(`MISS: ${error.message}`, 'miss'));
-  await runBootStep('receipts', loadReceipts, (error) => setReceiptStatus(`MISS: ${error.message}`, 'miss'));
-  await runBootStep('rozpočet', loadBudget, (error) => {
+  if (canSeeSection('documents')) await runBootStep('dokumenty', loadDocuments, (error) => setDocumentStatus(`MISS: ${error.message}`, 'miss'));
+  if (canSeeSection('media')) await runBootStep('media', loadPhotos, (error) => setPhotoStatus(`MISS: ${error.message}`, 'miss'));
+  if (canSeeSection('receipts')) await runBootStep('receipts', loadReceipts, (error) => setReceiptStatus(`MISS: ${error.message}`, 'miss'));
+  if (canSeeSection('budget')) await runBootStep('rozpočet', loadBudget, (error) => {
     const el = document.getElementById('budgetStatus');
     if (el) el.textContent = `MISS: ${error.message}`;
   });
-  await runBootStep('watch-folder', loadWatchFolderMedia, (error) => setPhotoStatus(`MISS watch-folder: ${error.message}`, 'miss'));
-  await runBootStep('diary selects', loadDiarySelects, (error) => setDiaryStatus(`MISS selects: ${error.message}`, 'miss'));
-  await runBootStep('diary', loadDiary, (error) => setDiaryStatus(`MISS: ${error.message}`, 'miss'));
-  await runBootStep('záruky', loadWarrantyDashboard);
-  await runBootStep('upozorneni', loadWarrantyAlerts);
-  await runBootStep('watcher', loadWatcherMinimum, (error) => {
+  if (canSeeSection('media')) await runBootStep('watch-folder', loadWatchFolderMedia, (error) => setPhotoStatus(`MISS watch-folder: ${error.message}`, 'miss'));
+  if (canSeeSection('diary')) await runBootStep('diary selects', loadDiarySelects, (error) => setDiaryStatus(`MISS selects: ${error.message}`, 'miss'));
+  if (canSeeSection('diary')) await runBootStep('diary', loadDiary, (error) => setDiaryStatus(`MISS: ${error.message}`, 'miss'));
+  if (canSeeSection('receipts')) await runBootStep('záruky', loadWarrantyDashboard);
+  if (canSeeSection('receipts')) await runBootStep('upozorneni', loadWarrantyAlerts);
+  if (canSeeSection('watcher')) await runBootStep('watcher', loadWatcherMinimum, (error) => {
     const el = document.getElementById('watcherSummary');
     if (el) el.textContent = `MISS: ${error.message}`;
   });

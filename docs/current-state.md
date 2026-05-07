@@ -1136,3 +1136,51 @@ Ověřeno lokálně:
 - `api/services/mailService.js` syntax check
 - `api/app.js` syntax check
 - `scripts/smoke-check.js`
+
+---
+
+## RBAC / USER RIGHTS CHECKPOINT (2026-05-07)
+
+Přidána základní administrace práv:
+- Role:
+  - `admin` / Správce:
+    - může vše
+    - vidí všechny sekce
+    - může zapisovat obsah
+    - může měnit systémové části a role uživatelů
+  - `user` / Uživatel:
+    - čte a zapisuje běžný obsah
+    - nemůže editovat systémové části
+    - nemůže měnit role uživatelů
+  - `guest`:
+    - pouze nahlíží
+    - nemůže zapisovat
+- DB:
+  - `users.role`
+  - existující uživatelé bez role se migrují na `admin`, aby se nezamkl existující účet
+  - první účet ze setupu je `admin`
+  - další registrace jsou výchozí `guest`
+- Backend:
+  - `api/middleware/accessControl.js`
+  - role se vynucují na API, nejen ve frontendu
+  - write akce pro `guest` vrací `write_forbidden`
+  - systémové write akce pro `user` vrací `system_write_forbidden`
+  - zakázané sekce vrací `section_forbidden`
+  - chráněné jsou dokumenty, faktury, média, deník, rozpočet, stavební okruhy, watcher a watch-folder
+- Auth API:
+  - `GET /api/auth/roles`
+  - `GET /api/auth/users` pouze admin
+  - `PUT /api/auth/users/:id/role` pouze admin
+  - správce nemůže snížit vlastní roli přes UI/API
+- Frontend:
+  - uživatelský panel ukazuje aktuální roli
+  - správce má v uživatelském panelu správu rolí
+  - navigace a sekce se schovávají podle role
+  - boot nenačítá sekce, které daná role nevidí
+
+Ověřeno lokálně:
+- `app/app.js` syntax check
+- `api/routes/auth.js` syntax check
+- `api/middleware/accessControl.js` syntax check
+- `api/app.js` syntax check
+- `scripts/smoke-check.js`
