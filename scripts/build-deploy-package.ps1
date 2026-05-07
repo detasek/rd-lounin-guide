@@ -41,6 +41,7 @@ $Files = @(
   "api\package.json",
   "api\package-lock.json",
   "docker-compose.yml",
+  ".env.example",
   "package.json",
   "package-lock.json",
   ".gitignore"

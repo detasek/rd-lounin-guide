@@ -55,6 +55,15 @@ function checkFrontendFiles() {
   }
   if (!/<script\s+src="config\.js"><\/script>/.test(html)) fail('index.html must load config.js');
   if (!/<script\s+src="app\.js(?:\?[^"]*)?"><\/script>/.test(html)) fail('index.html must load app.js');
+
+  const config = read('app/config.js');
+  if (!config.includes("API_BASE: '/api'")) {
+    fail('config.js must use same-origin API_BASE for Synology/Cloudflare deployment');
+  }
+
+  const nginxConfig = read('app/nginx.conf');
+  if (!nginxConfig.includes('proxy_pass http://backend:3000/api/')) fail('nginx.conf must proxy /api to backend');
+  if (!nginxConfig.includes('proxy_pass http://backend:3000/files/')) fail('nginx.conf must proxy /files to backend');
 }
 
 function checkDriftSignals() {

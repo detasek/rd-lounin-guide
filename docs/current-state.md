@@ -831,3 +831,31 @@ Finalni kontrola po refaktoru:
 - spustit `node scripts/smoke-check.js`
 - spustit syntax check aktivnich JS souboru
 - pred NAS deployem nahrat i novy `api/lib/runtimePaths.js`
+
+---
+
+## CLOUDFLARE ACCESS CHECKPOINT (2026-05-07)
+
+Pripraveno pro Cloudflare Tunnel:
+- frontend uz pouziva same-origin API:
+  - `app/config.js`: `API_BASE: '/api'`
+- Nginx frontend proxy:
+  - `app/nginx.conf`
+  - `/api/*` -> `backend:3000/api/*`
+  - `/files/*` -> `backend:3000/files/*`
+- `docker-compose.yml` mountuje Nginx config do frontend containeru.
+- `docker-compose.yml` obsahuje volitelnou sluzbu `cloudflared` v profilu `cloudflare`.
+- `.env.example` obsahuje `CLOUDFLARED_TOKEN`.
+
+Cloudflare postup:
+1. V Cloudflare Zero Trust vytvor remotely-managed Cloudflare Tunnel.
+2. Public hostname nastav na domenu/subdomenu, napr. `rd.example.cz`.
+3. Service nastav na:
+   - `http://frontend:80`
+4. Na NAS vytvor `.env` podle `.env.example` a vloz tunnel token.
+5. Spust:
+   - `docker compose --profile cloudflare up -d`
+
+Poznamka:
+- Pro lokalni LAN pristup dal funguje `http://SYNOLOGY_IP:8091`.
+- Pres Cloudflare se nema pouzivat port `3010`; vse jde pres jednu HTTPS domenu a Nginx proxy.
