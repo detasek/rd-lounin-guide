@@ -163,7 +163,7 @@ router.delete('/:id', (req, res) => {
   db.get(`SELECT * FROM documents WHERE id = ?`, [req.params.id], (err, row) => {
     if (!row) return res.json({ deleted: 0 });
 
-    const fullPath = '/data' + row.file_path;
+    const fullPath = '/data/uploads' + row.file_path;
 
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);

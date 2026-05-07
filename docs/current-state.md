@@ -762,8 +762,11 @@ Lokalni cleanup:
   - pridany helper `getDocumentScopePath()`
   - batch/next triage akce pouzivaji jednotny scope path
   - odlozene dokumenty jsou preskoceny i ve starsich batch akcich `Zaradit vse bez navrhu`, `Zaradit viditelne`, `Presunout sem X`
+- Opraven document delete cleanup:
+  - `DELETE /api/documents/:id` maze fyzicky soubor z `/data/uploads` podle `documents.file_path`
 
 Nasadit po tomto checkpointu:
+- `api/routes/documents.js`
 - `app/app.js`
 - `docs/current-state.md`
 - odstranit vyse uvedene backup soubory z NAS workspace, pokud tam existuji
