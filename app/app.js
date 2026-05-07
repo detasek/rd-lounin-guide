@@ -44,15 +44,82 @@ let lastManualDocumentProductId = null;
 const PROJECT_DOCS_WORKBENCH = 'projektova dokumentace rd';
 const TRIAGE_PREFS_KEY = 'rd-lounin-triage-prefs-v1';
 const TRIAGE_DEFERRED_KEY = 'rd-lounin-triage-deferred-v1';
+const THEME_KEY = 'rd-lounin-theme-v1';
+const LAYOUT_KEY = 'rd-lounin-layout-v1';
 let deferredDocumentIds = [];
+
+function closestAppSection(element) {
+  return element ? element.closest('section[id]') : null;
+}
+
+function setActiveNav(sectionId) {
+  document.querySelectorAll('.nav-link').forEach((button) => {
+    button.classList.toggle('active', button.dataset.section === sectionId);
+  });
+}
+
+function applyTheme(theme) {
+  const nextTheme = theme === 'dark' ? 'dark' : 'light';
+  document.body.classList.toggle('theme-dark', nextTheme === 'dark');
+  const toggle = document.getElementById('themeToggle');
+  if (toggle) toggle.setAttribute('aria-pressed', String(nextTheme === 'dark'));
+  try {
+    window.localStorage.setItem(THEME_KEY, nextTheme);
+  } catch (_) {}
+}
+
+function applyLayoutMode(mode) {
+  const compact = mode === 'compact';
+  document.body.classList.toggle('compact-mode', compact);
+  const toggle = document.getElementById('layoutToggle');
+  if (toggle) toggle.textContent = compact ? 'AUTO' : 'PC';
+  try {
+    window.localStorage.setItem(LAYOUT_KEY, compact ? 'compact' : 'desktop');
+  } catch (_) {}
+}
+
+function initAppShell() {
+  let storedTheme = 'light';
+  let storedLayout = 'desktop';
+  try {
+    storedTheme = window.localStorage.getItem(THEME_KEY) || storedTheme;
+    storedLayout = window.localStorage.getItem(LAYOUT_KEY) || storedLayout;
+  } catch (_) {}
+
+  applyTheme(storedTheme);
+  applyLayoutMode(storedLayout);
+
+  document.querySelectorAll('.nav-link').forEach((button) => {
+    button.addEventListener('click', () => {
+      const sectionId = button.dataset.section;
+      if (!sectionId) return;
+      setActiveNav(sectionId);
+      scrollToSection(sectionId);
+    });
+  });
+
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      applyTheme(document.body.classList.contains('theme-dark') ? 'light' : 'dark');
+    });
+  }
+
+  const layoutToggle = document.getElementById('layoutToggle');
+  if (layoutToggle) {
+    layoutToggle.addEventListener('click', () => {
+      applyLayoutMode(document.body.classList.contains('compact-mode') ? 'desktop' : 'compact');
+    });
+  }
+}
 
 const STARTER_PRODUCTS_TOP8 = [
   { name: 'Zakladova deska', description: 'Konstrukcni celek: skladba, vykresy, kalkulace, fotky armovani a betonaze.' },
   { name: 'Zdivo', description: 'Nosny a vyplnovy system: cihly, preklady, technicke listy, fotky zdeni.' },
   { name: 'Stropy', description: 'Varianty a realizace stropu: MIAKO / SPIROLL / PREFA, statika, montaz.' },
   { name: 'Stresni plast', description: 'Krytina, folie, late, detaily, fotky realizace strechy.' },
-  { name: 'Svisla okna a dvere', description: 'Fasadni okna, vstupni dvere, specifikace, doklady, zaruky.' },
-  { name: 'Tepelne cerpadlo', description: 'Vybrany system vytapeni: nabidky, technicke listy, zaruka, servis.' },
+  { name: 'Svislá okna a dveře', description: 'Fasádní okna, vstupní dveře, specifikace, doklady, záruky.' },
+  { name: 'Tepelné čerpadlo', description: 'Vybraný systém vytápění: nabídky, technické listy, záruka, servis.' },
   { name: 'Podlahove topeni', description: 'Rozvody podlahoveho topeni, projekt okruhu, fotky pred zalitim.' },
   { name: 'FVE', description: 'Panely, menic, pripojovaci podminky, montazni system, revize.' }
 ];
@@ -153,7 +220,7 @@ async function copyText(value, successMessage = 'Zkopirovano.') {
     }
     setPhotoStatus(successMessage, 'ok');
   } catch (_) {
-    setPhotoStatus('MISS: kopirovani selhalo', 'miss');
+    setPhotoStatus('MISS: kopírování selhalo', 'miss');
   }
 }
 
@@ -305,6 +372,8 @@ function undeferDocumentId(docId) {
 function scrollToSection(id) {
   const el = document.getElementById(id);
   if (!el) return;
+  const section = closestAppSection(el) || el;
+  setActiveNav(section.id);
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -351,7 +420,7 @@ async function loadSelectedProductSummary() {
     if (guideEl) guideEl.textContent = 'Zarazeni: -';
     if (healthEl) healthEl.textContent = 'Stav produktu: -';
     if (issuesEl) issuesEl.textContent = 'K reseni: -';
-    if (nextEl) nextEl.textContent = 'Dalsi krok: -';
+    if (nextEl) nextEl.textContent = 'Další krok: -';
     if (completionEl) completionEl.textContent = 'Hotovost: -';
     if (checklistEl) checklistEl.textContent = 'Checklist: -';
     return;
@@ -424,13 +493,13 @@ async function loadSelectedProductSummary() {
     else if (missingSupplier > 0) nextStep = `Dopln dodavatele u receipts (${missingSupplier}).`;
     else if (missingPurchaseDate > 0) nextStep = `Dopln datum nakupu u receipts (${missingPurchaseDate}).`;
     else if (pendingReceipts > 0) nextStep = `Dokoncit pending receipts (${pendingReceipts}).`;
-    else if (expiringSoon > 0) nextStep = `Zkontroluj zaruky koncici do 30 dni (${expiringSoon}).`;
+    else if (expiringSoon > 0) nextStep = `Zkontroluj záruky končící do 30 dní (${expiringSoon}).`;
     else if (!documentList.length) nextStep = 'Pridat prvni dokument k produktu.';
     else if (!photoList.length) nextStep = 'Pridat prvni foto nebo video.';
     else if (!diaryForProduct.length) nextStep = 'Pridat prvni zapis do deniku.';
 
     el.textContent =
-      `Produkt: ${currentProductName}${isWorkbench ? ' | staging/workbench' : ''} | dokumenty: ${documentList.length} (pdf ${pdfDocuments}, obrazky ${imageDocuments}, ostatni ${otherDocuments}) | receipts: ${receiptList.length} (ready ${readyReceipts}, pending ${pendingReceipts}) | media: ${photoList.length} (obrazky ${imageCount}, videa ${videoCount}) | diary: ${diaryForProduct.length} | diary filtr: ${diaryFilter}`;
+      `Produkt: ${currentProductName}${isWorkbench ? ' | staging/workbench' : ''} | dokumenty: ${documentList.length} (pdf ${pdfDocuments}, obrázky ${imageDocuments}, ostatní ${otherDocuments}) | receipts: ${receiptList.length} (ready ${readyReceipts}, pending ${pendingReceipts}) | media: ${photoList.length} (obrázky ${imageCount}, videa ${videoCount}) | diary: ${diaryForProduct.length} | diary filtr: ${diaryFilter}`;
 
     if (guideEl) {
       guideEl.textContent = isWorkbench
@@ -450,9 +519,9 @@ async function loadSelectedProductSummary() {
       const parts = [
         `pending ${pendingReceipts}`,
         `review ${reviewNeeded}`,
-        `chybi doklad ${missingDocumentNumber}`,
-        `chybi dodavatel ${missingSupplier}`,
-        `chybi datum ${missingPurchaseDate}`,
+        `chybí doklad ${missingDocumentNumber}`,
+        `chybí dodavatel ${missingSupplier}`,
+        `chybí datum ${missingPurchaseDate}`,
         `zaruka do 30 dni ${expiringSoon}`,
         `inbox ${inboxCount}`
       ];
@@ -462,16 +531,16 @@ async function loadSelectedProductSummary() {
       }).length;
       const unsortedDocumentCount = documentList.filter((item) => !suggestDocumentTarget(item)).length;
       issuesEl.textContent = isWorkbench
-        ? `K reseni: trideni dokumentace | doporucene ${suggestedDocumentCount} | bez navrhu ${unsortedDocumentCount} | inbox ${inboxCount}`
+        ? `K reseni: trideni dokumentace | doporučené ${suggestedDocumentCount} | bez návrhu ${unsortedDocumentCount} | inbox ${inboxCount}`
         : `K reseni: ${parts.join(' | ')}`;
     }
 
     if (nextEl) {
-      nextEl.textContent = `Dalsi krok: ${nextStep}`;
+      nextEl.textContent = `Další krok: ${nextStep}`;
     }
     if (completionEl) {
       completionEl.textContent = isWorkbench
-        ? `Hotovost: staging | dokumenty ${documentList.length} | doporucene ${documentList.filter((item) => {
+        ? `Hotovost: staging | dokumenty ${documentList.length} | doporučené ${documentList.filter((item) => {
             const suggestion = suggestDocumentTarget(item);
             return suggestion && Number(suggestion.productId) !== Number(item.product_id);
           }).length}`
@@ -581,7 +650,7 @@ async function loadProducts() {
 
   if (!products.length) {
     selectedProductId = null;
-    el.innerHTML = '<div class="muted">Zatim zadne produkty.</div>';
+    el.innerHTML = '<div class="muted">Zatím žádné produkty.</div>';
     updateReceiptToolbar([]);
     loadWatchFolderMedia();
     loadSelectedProductSummary();
@@ -780,7 +849,7 @@ async function undeferAllVisibleDocuments() {
     .filter((doc) => isDeferredDocument(doc.id));
 
   if (!visibleDeferredDocs.length) {
-    setDocumentStatus('Zadne viditelne odlozene dokumenty k vraceni.', 'ok');
+    setDocumentStatus('Žádné viditelné odložené dokumenty k vrácení.', 'ok');
     return;
   }
 
@@ -795,7 +864,7 @@ async function deferAllVisibleActionableDocuments() {
     .filter((doc) => isActionableSuggestedDocument(doc) || isActionableUnsortedDocument(doc));
 
   if (!visibleActionableDocs.length) {
-    setDocumentStatus('Zadne viditelne dokumenty k odlozeni.', 'ok');
+    setDocumentStatus('Žádné viditelné dokumenty k odložení.', 'ok');
     return;
   }
 
@@ -892,12 +961,12 @@ function suggestDocumentTarget(doc) {
 
   const rules = [
     { keywords: ['fve', 'stridac', 'deye', 'solarni', 'panel'], target: 'FVE' },
-    { keywords: ['okna', 'okno', 'dvere', 'sokol okna'], target: 'Svisla okna a dvere' },
+    { keywords: ['okna', 'okno', 'dvere', 'sokol okna'], target: 'Svislá okna a dveře' },
     { keywords: ['stresni okna', 'stresni'], target: 'Stresni okna' },
     { keywords: ['zaluzie', 'rolety', 'stineni'], target: 'Stineni' },
-    { keywords: ['podlahove topeni', 'podlahovka', 'rozdělovac', 'rozdelo', 'okruhy'], target: 'Podlahove topeni' },
+    { keywords: ['podlahove topeni', 'podlahovka', 'rozdělovač', 'rozdelo', 'okruhy'], target: 'Podlahove topeni' },
     { keywords: ['anhydrit', 'zalivka', 'beton podlah', 'lite podlahy'], target: 'Podlahove souvrstvi' },
-    { keywords: ['tepelne cerpadlo', 'tč', 'tc ', 'acond', 'ivt', 'stiebel', 'ctc', 'klimotop', 'pzp', 'reo heating', 'ac heating'], target: 'Tepelne cerpadlo' },
+    { keywords: ['tepelne cerpadlo', 'tč', 'tc ', 'acond', 'ivt', 'stiebel', 'ctc', 'klimotop', 'pzp', 'reo heating', 'ac heating'], target: 'Tepelné čerpadlo' },
     { keywords: ['rekuperace', 'vzduchotechnika', 'nilan', 'regulus', 'zehnder', 'storc'], target: 'Rekuperacni jednotka' },
     { keywords: ['potrubi', 'vyustky', 'rozvody rekuperace'], target: 'Rozvody rekuperace' },
     { keywords: ['zakladova deska', 'dek konfigurator'], target: 'Zakladova deska' },
@@ -1054,17 +1123,17 @@ async function loadDocuments() {
 
   if (summaryEl) {
     summaryEl.textContent =
-      `Documents: ${docs.length} | viditelne: ${visibleDocs.length} | pdf: ${pdfCount} | obrazky: ${imageCount} | ostatni: ${otherCount} | duplicity: ${duplicateCount} | doporucene: ${suggestedCount} | bez navrhu: ${unsortedCount} | odlozene: ${deferredCount} | scope: ${documentScope} | filtr: ${documentFilter} | hledani: ${documentSearch || '-'} | razeni: ${documentSort}`;
+      `Dokumenty: ${docs.length} | viditelné: ${visibleDocs.length} | pdf: ${pdfCount} | obrázky: ${imageCount} | ostatní: ${otherCount} | duplicity: ${duplicateCount} | doporučené: ${suggestedCount} | bez návrhu: ${unsortedCount} | odložené: ${deferredCount} | scope: ${documentScope} | filtr: ${documentFilter} | hledani: ${documentSearch || '-'} | razeni: ${documentSort}`;
   }
 
   if (suggestionsEl) {
     if (!suggestionBuckets.length) {
-      suggestionsEl.textContent = unsortedCount ? `Navrhy trideni: zadne. Bez navrhu: ${unsortedCount}.` : 'Navrhy trideni: zadne.';
+      suggestionsEl.textContent = unsortedCount ? `Návrhy třídění: žádné. Bez návrhu: ${unsortedCount}.` : 'Návrhy třídění: žádné.';
     } else {
       suggestionsEl.innerHTML = `
         <div class="card">
-          <b>Navrhy trideni</b>
-          <div class="muted" style="margin-top:6px;">Bez navrhu: ${unsortedCount}</div>
+          <b>Návrhy třídění</b>
+          <div class="muted" style="margin-top:6px;">Bez návrhu: ${unsortedCount}</div>
           ${suggestionBuckets.map((bucket) => `
             <div style="margin-top:8px;">
               <div>${esc(bucket.productName)}: ${bucket.count}</div>
@@ -1083,7 +1152,7 @@ async function loadDocuments() {
     const currentTop = currentBuckets.slice(0, 5).map((bucket) => `${bucket.productName}: ${bucket.count}`).join(' | ');
     const targetTop = suggestionBuckets.slice(0, 5).map((bucket) => `${bucket.productName}: ${bucket.count}`).join(' | ');
     triageSummaryEl.textContent =
-      `Rozlozeni: ${currentTop || '-'} | cilove presuny: ${targetTop || '-'} | bez navrhu: ${unsortedCount} | odlozene: ${deferredCount}`;
+      `Rozložení: ${currentTop || '-'} | cílové přesuny: ${targetTop || '-'} | bez návrhu: ${unsortedCount} | odložené: ${deferredCount}`;
   }
 
   if (workbenchEl) {
@@ -1097,25 +1166,25 @@ async function loadDocuments() {
         <div class="card">
           <b>Workbench trideni</b>
           ${workbenchDone ? `<div class="muted" style="margin-top:6px;color:#0f766e;"><b>DONE: staging je dotrideny</b></div>` : ''}
-          <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporucene: ${actionableSuggested.length} | bez navrhu: ${actionableUnsorted.length} | odlozene: ${deferredCount} | hotovo: ${triageDone}/${docs.length} (${triagePct}%)</div>
-          <div class="muted" style="margin-top:6px;">Posledni rucni cil: ${lastManualDocumentProductId ? esc(productsMap[lastManualDocumentProductId] || `produkt #${lastManualDocumentProductId}`) : 'zadny'}</div>
+          <div class="muted" style="margin-top:6px;">Ve stagingu: ${docs.length} | doporučené: ${actionableSuggested.length} | bez návrhu: ${actionableUnsorted.length} | odložené: ${deferredCount} | hotovo: ${triageDone}/${docs.length} (${triagePct}%)</div>
+          <div class="muted" style="margin-top:6px;">Posledni ruční cíl: ${lastManualDocumentProductId ? esc(productsMap[lastManualDocumentProductId] || `produkt #${lastManualDocumentProductId}`) : 'zadny'}</div>
           <div class="row-actions" style="margin-top:8px;">
             <button type="button" class="ghost-btn" onclick="setDocumentFilter('all')">Vse ve stagingu</button>
-            <button type="button" class="ghost-btn" onclick="setDocumentFilter('todo')">Jen k reseni</button>
-            <button type="button" class="ghost-btn" onclick="setDocumentFilter('suggested')">Jen doporucene</button>
-            <button type="button" class="ghost-btn" onclick="setDocumentFilter('unsorted')">Jen bez navrhu</button>
-            <button type="button" class="ghost-btn" onclick="setDocumentFilter('deferred')">Jen odlozene</button>
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('todo')">Jen k řešení</button>
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('suggested')">Jen doporučené</button>
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('unsorted')">Jen bez návrhu</button>
+            <button type="button" class="ghost-btn" onclick="setDocumentFilter('deferred')">Jen odložené</button>
           </div>
           <div class="row-actions" style="margin-top:8px;">
-            <button type="button" class="ghost-btn" onclick="openNextSuggestedDocument()">Otevrit dalsi doporuceny</button>
-            <button type="button" class="ghost-btn" onclick="openNextUnsortedDocument()">Otevrit dalsi bez navrhu</button>
+            <button type="button" class="ghost-btn" onclick="openNextSuggestedDocument()">Otevřít další doporučený</button>
+            <button type="button" class="ghost-btn" onclick="openNextUnsortedDocument()">Otevřít další bez návrhu</button>
           </div>
           <div class="row-actions" style="margin-top:8px;">
-            <button type="button" class="ghost-btn" onclick="moveNextSuggestedDocument()">Presunout dalsi doporuceny</button>
-            <button type="button" class="ghost-btn" onclick="moveNextUnsortedDocumentToLastTarget()">Zaradit dalsi bez navrhu do posledniho cile</button>
-            <button type="button" class="ghost-btn" onclick="deferNextActionableDocument()">Odlozit dalsi k reseni</button>
-            <button type="button" class="ghost-btn" onclick="deferAllVisibleActionableDocuments()">Odlozit viditelne k reseni</button>
-            <button type="button" class="ghost-btn" onclick="undeferAllVisibleDocuments()">Vratit viditelne odlozene</button>
+            <button type="button" class="ghost-btn" onclick="moveNextSuggestedDocument()">Přesunout další doporučený</button>
+            <button type="button" class="ghost-btn" onclick="moveNextUnsortedDocumentToLastTarget()">Zařadit další bez návrhu do posledního cíle</button>
+            <button type="button" class="ghost-btn" onclick="deferNextActionableDocument()">Odložit další k řešení</button>
+            <button type="button" class="ghost-btn" onclick="deferAllVisibleActionableDocuments()">Odlozit viditelné k řešení</button>
+            <button type="button" class="ghost-btn" onclick="undeferAllVisibleDocuments()">Vratit viditelné odložené</button>
           </div>
         </div>
       `;
@@ -1124,15 +1193,15 @@ async function loadDocuments() {
 
   if (!visibleDocs.length) {
     const label =
-      documentFilter === 'pdf' ? 'Zadne PDF dokumenty.' :
-      documentFilter === 'image' ? 'Zadne obrazkove dokumenty.' :
-      documentFilter === 'other' ? 'Zadne ostatni dokumenty.' :
-      documentFilter === 'todo' ? 'Zadne dokumenty k reseni.' :
-      documentFilter === 'suggested' ? 'Zadne doporucene presuny.' :
-      documentFilter === 'unsorted' ? 'Zadne dokumenty bez navrhu.' :
-      documentFilter === 'deferred' ? 'Zadne odlozene dokumenty.' :
+      documentFilter === 'pdf' ? 'Žádné PDF dokumenty.' :
+      documentFilter === 'image' ? 'Žádné obrázkové dokumenty.' :
+      documentFilter === 'other' ? 'Žádné ostatní dokumenty.' :
+      documentFilter === 'todo' ? 'Žádné dokumenty k řešení.' :
+      documentFilter === 'suggested' ? 'Žádné doporučené přesuny.' :
+      documentFilter === 'unsorted' ? 'Žádné dokumenty bez návrhu.' :
+      documentFilter === 'deferred' ? 'Žádné odložené dokumenty.' :
       documentSearch ? 'Hledani nic nenaslo.' :
-      'Zadne dokumenty.';
+      'Žádné dokumenty.';
     el.innerHTML = `<div class="muted">${label}</div>`;
     updateDocumentFilterButtons();
     updateDocumentScopeButtons();
@@ -1159,11 +1228,11 @@ async function loadDocuments() {
         <a href="#" onclick="openMediaViewer('${url}', '${esc(doc.mime_type || '')}');return false;"><b>${docIcon(doc)} ${esc(docName)}</b></a>
         ${isDeferred ? `<div class="muted" style="color:#7c3aed;"><b>ODLOZENO</b></div>` : ''}
         ${inWorkbench && suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<div class="muted" style="color:#0f766e;"><b>TRIAGE: doporuceny presun</b></div>` : ''}
-        ${inWorkbench && !suggestion ? `<div class="muted" style="color:#b45309;"><b>TRIAGE: rucni zarazeni</b></div>` : ''}
+        ${inWorkbench && !suggestion ? `<div class="muted" style="color:#b45309;"><b>TRIAGE: rucni zařazení</b></div>` : ''}
         ${isDuplicate ? `<div class="muted" style="color:#b45309;">Mozna duplicita</div>` : ''}
         <div class="muted">Aktualne: ${esc(currentProductName)}</div>
         ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<div class="muted" style="color:#0f766e;">Doporuceno presunout do: ${esc(suggestion.productName)}</div>` : ''}
-        ${!suggestion ? `<div class="muted" style="color:#b45309;">Doporuceni: zadne</div>` : ''}
+        ${!suggestion ? `<div class="muted" style="color:#b45309;">Doporučení: žádné</div>` : ''}
         <div class="muted">${esc(doc.mime_type || '-')} | Vytvoreno: ${esc(createdAt)}</div>
         <div class="muted">Cesta: ${esc(absolutePath)}</div>
         ${!suggestion ? `
@@ -1177,8 +1246,8 @@ async function loadDocuments() {
         <div class="row-actions">
           ${isPdf ? `<button class="ghost-btn" onclick="togglePreview(${doc.id})">Nahled</button>` : ''}
           <button class="ghost-btn" onclick="toggleDocumentEditor(${doc.id})">Upravit nazev</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(docName)}, "Nazev zkopirovan.")'>Kopirovat nazev</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopirovana.")'>Kopirovat cestu</button>
+          <button class="ghost-btn" onclick='copyText(${JSON.stringify(docName)}, "Název zkopírován.")'>Kopírovat název</button>
+          <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopírována.")'>Kopírovat cestu</button>
           ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<button class="ghost-btn" onclick="openSuggestedProduct(${suggestion.productId}, ${JSON.stringify(suggestion.productName)})">Otevrit doporuceny produkt</button>` : ''}
           ${isDeferred ? `<button class="ghost-btn" onclick="undeferDocument(${doc.id})">Vratit do fronty</button>` : `<button class="ghost-btn" onclick="deferDocument(${doc.id})">Odlozit</button>`}
           <button class="ghost-btn" onclick="deleteDocument(${doc.id})">Smazat</button>
@@ -1189,7 +1258,7 @@ async function loadDocuments() {
             ${buildProductOptions(doc.product_id)}
           </select>
           <button class="ghost-btn" onclick="saveDocumentName(${doc.id})">Ulozit nazev</button>
-          <button class="ghost-btn" onclick="moveDocumentToSelectedProduct(${doc.id})">Presunout na vybrany produkt</button>
+          <button class="ghost-btn" onclick="moveDocumentToSelectedProduct(${doc.id})">Přesunout na vybraný produkt</button>
           ${suggestion && Number(suggestion.productId) !== Number(doc.product_id) ? `<button class="ghost-btn" onclick="moveDocumentToSuggestedProduct(${doc.id}, ${suggestion.productId}, ${JSON.stringify(suggestion.productName)})">Presunout na doporuceny</button>` : ''}
         </div>
         <div id="preview-${doc.id}" style="display:none;">
@@ -1216,7 +1285,7 @@ async function moveAllSuggestedDocuments() {
     .filter((item) => !isDeferredDocument(item.doc.id) && item.suggestion && Number(item.suggestion.productId) !== Number(item.doc.product_id));
 
   if (!candidates.length) {
-    setDocumentStatus('Zadne doporucene presuny.', 'ok');
+    setDocumentStatus('Žádné doporučené přesuny.', 'ok');
     return;
   }
 
@@ -1233,7 +1302,7 @@ async function moveAllSuggestedDocuments() {
   await loadDocuments();
   await loadProducts();
   await loadSelectedProductSummary();
-  setDocumentStatus(`Presunuto doporucene: ${moved}.`, 'ok');
+  setDocumentStatus(`Presunuto doporučené: ${moved}.`, 'ok');
 }
 
 async function moveVisibleSuggestedDocuments() {
@@ -1242,7 +1311,7 @@ async function moveVisibleSuggestedDocuments() {
     .filter((doc) => isActionableSuggestedDocument(doc));
 
   if (!visibleDocs.length) {
-    setDocumentStatus('Zadne viditelne doporucene dokumenty k presunu.', 'ok');
+    setDocumentStatus('Žádné viditelné doporučené dokumenty k přesunu.', 'ok');
     return;
   }
 
@@ -1259,7 +1328,7 @@ async function moveVisibleSuggestedDocuments() {
   await loadDocuments();
   await loadProducts();
   await loadSelectedProductSummary();
-  setDocumentStatus(`Presunuto viditelne doporucene: ${moved}.`, 'ok');
+  setDocumentStatus(`Presunuto viditelné doporučené: ${moved}.`, 'ok');
 }
 
 async function copyVisibleDocumentsList() {
@@ -1267,7 +1336,7 @@ async function copyVisibleDocumentsList() {
   const visibleDocs = getVisibleDocumentsForCurrentView(docs);
 
   if (!visibleDocs.length) {
-    setDocumentStatus('Zadne viditelne dokumenty ke kopirovani.', 'ok');
+    setDocumentStatus('Žádné viditelné dokumenty ke kopírování.', 'ok');
     return;
   }
 
@@ -1289,7 +1358,7 @@ async function moveAllUnsortedDocuments() {
   const targetProductId = select?.value;
 
   if (!targetProductId) {
-    setDocumentStatus('MISS: vyber cilovy produkt pro bez navrhu', 'miss');
+    setDocumentStatus('MISS: vyber cilovy produkt pro bez návrhu', 'miss');
     return;
   }
 
@@ -1299,7 +1368,7 @@ async function moveAllUnsortedDocuments() {
     .filter((item) => !isDeferredDocument(item.doc.id) && !item.suggestion && Number(item.doc.product_id) !== Number(targetProductId));
 
   if (!candidates.length) {
-    setDocumentStatus('Zadne dokumenty bez navrhu k zarazeni.', 'ok');
+    setDocumentStatus('Žádné dokumenty bez návrhu k zařazení.', 'ok');
     return;
   }
 
@@ -1319,7 +1388,7 @@ async function moveAllUnsortedDocuments() {
   await loadProducts();
   await loadSelectedProductSummary();
   const targetName = productsMap[targetProductId] || 'vybraneho produktu';
-  setDocumentStatus(`Zarazeno bez navrhu do ${targetName}: ${moved}.`, 'ok');
+  setDocumentStatus(`Zarazeno bez návrhu do ${targetName}: ${moved}.`, 'ok');
 }
 
 async function moveVisibleDocumentsToTarget() {
@@ -1327,7 +1396,7 @@ async function moveVisibleDocumentsToTarget() {
   const targetProductId = select?.value;
 
   if (!targetProductId) {
-    setDocumentStatus('MISS: vyber cilovy produkt pro viditelne dokumenty', 'miss');
+    setDocumentStatus('MISS: vyber cilovy produkt pro viditelné dokumenty', 'miss');
     return;
   }
 
@@ -1336,7 +1405,7 @@ async function moveVisibleDocumentsToTarget() {
     .filter((doc) => !isDeferredDocument(doc.id) && Number(doc.product_id) !== Number(targetProductId));
 
   if (!visibleDocs.length) {
-    setDocumentStatus('Zadne viditelne dokumenty k zarazeni.', 'ok');
+    setDocumentStatus('Žádné viditelné dokumenty k zařazení.', 'ok');
     return;
   }
 
@@ -1355,7 +1424,7 @@ async function moveVisibleDocumentsToTarget() {
   await loadProducts();
   await loadSelectedProductSummary();
   const targetName = productsMap[targetProductId] || 'vybraneho produktu';
-  setDocumentStatus(`Zarazeno viditelne do ${targetName}: ${moved}.`, 'ok');
+  setDocumentStatus(`Zarazeno viditelné do ${targetName}: ${moved}.`, 'ok');
 }
 
 async function moveSuggestedDocumentsToProduct(productId, productName) {
@@ -1365,7 +1434,7 @@ async function moveSuggestedDocumentsToProduct(productId, productName) {
     .filter((item) => !isDeferredDocument(item.doc.id) && item.suggestion && Number(item.suggestion.productId) === Number(productId) && Number(item.doc.product_id) !== Number(productId));
 
   if (!candidates.length) {
-    setDocumentStatus(`Zadne dokumenty k presunu do ${productName}.`, 'ok');
+    setDocumentStatus(`Žádné dokumenty k přesunu do ${productName}.`, 'ok');
     return;
   }
 
@@ -1397,7 +1466,7 @@ async function openNextSuggestedDocument() {
     .find((doc) => isActionableSuggestedDocument(doc));
 
   if (!candidate) {
-    setDocumentStatus('Zadny dalsi doporuceny dokument.', 'ok');
+    setDocumentStatus('Žádný další doporučený dokument.', 'ok');
     return;
   }
 
@@ -1415,7 +1484,7 @@ async function openNextUnsortedDocument() {
     .find((doc) => isActionableUnsortedDocument(doc));
 
   if (!candidate) {
-    setDocumentStatus('Zadny dalsi dokument bez navrhu.', 'ok');
+    setDocumentStatus('Žádný další dokument bez návrhu.', 'ok');
     return;
   }
 
@@ -1423,7 +1492,7 @@ async function openNextUnsortedDocument() {
   openDocumentEditorId = candidate.id;
   await loadDocuments();
   scrollToSection('documentsList');
-  setDocumentStatus(`Otevren dokument bez navrhu #${candidate.id}.`, 'ok');
+  setDocumentStatus(`Otevren dokument bez návrhu #${candidate.id}.`, 'ok');
 }
 
 async function moveNextSuggestedDocument() {
@@ -1433,7 +1502,7 @@ async function moveNextSuggestedDocument() {
     .find((doc) => isActionableSuggestedDocument(doc));
 
   if (!candidate) {
-    setDocumentStatus('Zadny dalsi doporuceny dokument k presunu.', 'ok');
+    setDocumentStatus('Žádný další doporučený dokument k přesunu.', 'ok');
     return;
   }
 
@@ -1442,7 +1511,7 @@ async function moveNextSuggestedDocument() {
 
 async function moveNextUnsortedDocumentToLastTarget() {
   if (!lastManualDocumentProductId) {
-    setDocumentStatus('MISS: zatim neni posledni rucni cil', 'miss');
+    setDocumentStatus('MISS: zatím není posledni ruční cíl', 'miss');
     return;
   }
 
@@ -1452,7 +1521,7 @@ async function moveNextUnsortedDocumentToLastTarget() {
     .find((doc) => isActionableUnsortedDocument(doc));
 
   if (!candidate) {
-    setDocumentStatus('Zadny dalsi dokument bez navrhu k zarazeni.', 'ok');
+    setDocumentStatus('Žádný další dokument bez návrhu k zařazení.', 'ok');
     return;
   }
 
@@ -1463,7 +1532,7 @@ async function moveNextUnsortedDocumentToLastTarget() {
   await loadDocuments();
   await loadProducts();
   await loadSelectedProductSummary();
-  setDocumentStatus(`Dokument #${candidate.id} zarazen do ${(result?.document && productsMap[result.document.product_id]) || 'posledniho cile'}.`, 'ok');
+  setDocumentStatus(`Dokument #${candidate.id} zarazen do ${(result?.document && productsMap[result.document.product_id]) || 'posledního cíle'}.`, 'ok');
   await continueWorkbenchQueue('unsorted');
 }
 
@@ -1474,7 +1543,7 @@ async function deferNextActionableDocument() {
     .find((doc) => isActionableSuggestedDocument(doc) || isActionableUnsortedDocument(doc));
 
   if (!candidate) {
-    setDocumentStatus('Zadny dalsi dokument k odlozeni.', 'ok');
+    setDocumentStatus('Žádný další dokument k odložení.', 'ok');
     return;
   }
 
@@ -1517,7 +1586,7 @@ async function continueWorkbenchQueue(prefer = null) {
     openDocumentEditorId = nextUnsorted.id;
     await loadDocuments();
     scrollToSection('documentsList');
-    setDocumentStatus(`Pokracuj: dokument bez navrhu #${nextUnsorted.id}.`, 'ok');
+    setDocumentStatus(`Pokracuj: dokument bez návrhu #${nextUnsorted.id}.`, 'ok');
     return;
   }
 
@@ -1567,7 +1636,7 @@ async function moveDocumentToSelectedProduct(id) {
     await loadDocuments();
     await loadProducts();
     await loadSelectedProductSummary();
-    setDocumentStatus(`Dokument #${id} presunut na produkt ${selectedProductName()}.`, 'ok');
+    setDocumentStatus(`Dokument #${id} přesunut na produkt ${selectedProductName()}.`, 'ok');
     await continueWorkbenchQueue();
   } catch (e) {
     setDocumentStatus(`MISS: ${e.message}`, 'miss');
@@ -1587,7 +1656,7 @@ async function moveDocumentToSuggestedProduct(id, productId, productName) {
     await loadDocuments();
     await loadProducts();
     await loadSelectedProductSummary();
-    setDocumentStatus(`Dokument #${id} presunut do ${productName}.`, 'ok');
+    setDocumentStatus(`Dokument #${id} přesunut do ${productName}.`, 'ok');
     await continueWorkbenchQueue('suggested');
   } catch (e) {
     setDocumentStatus(`MISS: ${e.message}`, 'miss');
@@ -1747,7 +1816,7 @@ async function loadWarrantyDashboard() {
   });
 
   if (!items.length) {
-    el.innerHTML = '<div class="muted">Zadne zaruky ke sledovani.</div>';
+    el.innerHTML = '<div class="muted">Žádné záruky ke sledování.</div>';
     return;
   }
 
@@ -1780,7 +1849,7 @@ async function loadWarrantyAlerts() {
   });
 
   if (!alerts.length) {
-    el.innerHTML = '<small>Zadne koncici zaruky</small>';
+    el.innerHTML = '<small>Žádné končící záruky</small>';
     return;
   }
 
@@ -1820,17 +1889,17 @@ async function loadWatcherMinimum() {
       value: (r) => `${r.title || r.original_name || `receipt #${r.id}`} -> ${r.warranty_until || '-'}`
     },
     {
-      label: 'Chybi dodavatel',
+      label: 'Chybí dodavatel',
       items: watcher.groups?.missing_supplier || [],
       value: (r) => r.title || r.original_name || `receipt #${r.id}`
     },
     {
-      label: 'Chybi cislo dokladu',
+      label: 'Chybí číslo dokladu',
       items: watcher.groups?.missing_document_number || [],
       value: (r) => r.title || r.original_name || `receipt #${r.id}`
     },
     {
-      label: 'Chybi datum nakupu',
+      label: 'Chybí datum nákupu',
       items: watcher.groups?.missing_purchase_date || [],
       value: (r) => r.title || r.original_name || `receipt #${r.id}`
     }
@@ -1850,7 +1919,7 @@ async function loadWatcherMinimum() {
   if (!totalFlags) {
     listEl.innerHTML = `
       <div class="card muted">
-        Watcher je cisty. Zadny problem k reseni.
+        Watcher je cisty. Žádný problem k řešení.
         <div class="row-actions" style="margin-top:8px;">
           <button class="ghost-btn" onclick="approveAllReviewNeeded()">Schvalit vse review_needed</button>
         </div>
@@ -1934,7 +2003,7 @@ async function focusSelectedReceiptIssue(mode) {
 
   const receipt = receipts.find(matcher);
   if (!receipt) {
-    setReceiptStatus(`Nic k reseni pro filtr ${mode}.`, 'ok');
+    setReceiptStatus(`Nic k řešení pro filtr ${mode}.`, 'ok');
     return;
   }
 
@@ -2038,7 +2107,7 @@ async function loadReceipts() {
   setReceiptStatus('');
 
   if (!visibleReceipts.length) {
-    el.innerHTML = '<div class="card muted">Zadne receipts pro aktualni filtr.</div>';
+    el.innerHTML = '<div class="card muted">Žádné faktury pro aktuální filtr.</div>';
     return;
   }
 
@@ -2063,16 +2132,16 @@ async function loadReceipts() {
         <div class="muted">Datum: ${esc(receipt.purchase_date || '-')} | Castka: ${esc(receipt.total_amount || '-')}</div>
         <div class="muted">Status: ${esc(receipt.status || 'pending_review')} | OCR status: ${esc(receipt.ocr_status || 'not_processed')}</div>
         <div class="muted">Vytvoreno: ${esc(createdAt)} | Cesta: ${esc(absolutePath)}</div>
-        <div class="muted">Automaticky: typ receipt, source manual, zaruka 24 mesicu kdyz je datum a nic chybi.</div>
+        <div class="muted">Automaticky: typ receipt, source manual, záruka 24 měsíců, když je datum a nic nechybí.</div>
         ${ocrSummary ? `<div class="muted">${esc(ocrSummary)}</div>` : ''}
         <div class="row-actions">
           ${isPdf ? `<button class="ghost-btn" onclick="togglePreview('receipt-${receipt.id}')">Nahled</button>` : ''}
           <button class="ghost-btn" onclick="runReceiptOcrMinimum(${receipt.id})">OCR minimum</button>
           <button class="ghost-btn" onclick="approveReceiptOcr(${receipt.id})">Schvalit OCR</button>
           <button onclick="togglePreview('receipt-edit-${receipt.id}')">Upravit</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(name)}, "Nazev zkopirovan.")'>Kopirovat nazev</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(receipt.document_number || '')}, "Cislo dokladu zkopirovano.")'>Kopirovat doklad</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopirovana.")'>Kopirovat cestu</button>
+          <button class="ghost-btn" onclick='copyText(${JSON.stringify(name)}, "Název zkopírován.")'>Kopírovat název</button>
+          <button class="ghost-btn" onclick='copyText(${JSON.stringify(receipt.document_number || '')}, "Číslo dokladu zkopírováno.")'>Kopírovat doklad</button>
+          <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopírována.")'>Kopírovat cestu</button>
           <button class="ghost-btn" onclick="deleteReceipt(${receipt.id})">Smazat</button>
         </div>
 
@@ -2217,11 +2286,11 @@ async function loadPhotos() {
 
   if (summaryEl) {
     summaryEl.textContent =
-      `Media: ${photos.length} | obrazky: ${imageCount} | videa: ${videoCount} | velikost: ${formatMb(totalBytes)} | filtr: ${mediaFilter}`;
+      `Media: ${photos.length} | obrázky: ${imageCount} | videa: ${videoCount} | velikost: ${formatMb(totalBytes)} | filtr: ${mediaFilter}`;
   }
 
   if (!visiblePhotos.length) {
-    const label = mediaFilter === 'image' ? 'Zadne obrazky.' : mediaFilter === 'video' ? 'Zadna videa.' : 'Zadne fotky.';
+    const label = mediaFilter === 'image' ? 'Žádné obrázky.' : mediaFilter === 'video' ? 'Žádná videa.' : 'Žádné fotky.';
     el.innerHTML = `<div class="muted">${label}</div>`;
     updateMediaFilterButtons();
     return;
@@ -2245,8 +2314,8 @@ async function loadPhotos() {
         <div class="row-actions">
           <button class="ghost-btn" onclick="openMediaViewer('${url}', '${esc(photo.mime_type || '')}')">Otevrit</button>
           <button class="ghost-btn" onclick="toggleMediaEditor(${photo.id})">Upravit nazev</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(photoTitle)}, "Nazev zkopirovan.")'>Kopirovat nazev</button>
-          <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopirovana.")'>Kopirovat cestu</button>
+          <button class="ghost-btn" onclick='copyText(${JSON.stringify(photoTitle)}, "Název zkopírován.")'>Kopírovat název</button>
+          <button class="ghost-btn" onclick='copyText(${JSON.stringify(absolutePath)}, "Cesta zkopírována.")'>Kopírovat cestu</button>
           <button class="ghost-btn" onclick="deletePhoto(${photo.id})">Smazat</button>
         </div>
         <div style="display:${shouldOpenEditor ? 'block' : 'none'};margin-top:8px;">
@@ -2331,7 +2400,7 @@ async function loadWatchFolderMedia() {
   hintEl.textContent =
     `Sleduji ${data.watch_dir}` +
     `${selectedProductId ? ` | produkt ${selectedProductName()}` : ''}` +
-    ` | vse: ${counts.total || 0}, obrazky: ${counts.image || 0}, videa: ${counts.video || 0}`;
+    ` | vše: ${counts.total || 0}, obrázky: ${counts.image || 0}, videa: ${counts.video || 0}`;
   listEl.innerHTML = '';
 
   if (!data.files.length) {
@@ -2346,7 +2415,7 @@ async function loadWatchFolderMedia() {
       <div class="row-actions">
         <button type="button" class="ghost-btn" onclick='importWatchFolderMedia(${JSON.stringify(file.filename)})'>Import do produktu</button>
         <button type="button" class="ghost-btn" onclick='deleteWatchFolderMedia(${JSON.stringify(file.filename)})'>Smazat z inboxu</button>
-        <button type="button" class="ghost-btn" onclick='copyText(${JSON.stringify(file.filename)}, "Nazev zkopirovan.")'>Kopirovat nazev</button>
+        <button type="button" class="ghost-btn" onclick='copyText(${JSON.stringify(file.filename)}, "Název zkopírován.")'>Kopírovat název</button>
       </div>
     </div>
   `).join('');
@@ -2447,8 +2516,8 @@ async function loadDiary() {
     data = await apiGet('/diary');
   } catch (e) {
     if (String(e.message || '').includes('HTTP 404') || String(e.message || '').includes('route_not_found')) {
-      el.innerHTML = '<small>Denik zatim neni aktivni.</small>';
-      setDiaryStatus('Diary backend zatim neni aktivni.', 'miss');
+      el.innerHTML = '<small>Deník zatím není aktivní.</small>';
+      setDiaryStatus('Deník backend zatím není aktivní.', 'miss');
       return;
     }
     throw e;
@@ -2464,7 +2533,7 @@ async function loadDiary() {
   setDiaryStatus(`Zaznamy: ${visibleData.length} / ${data.length} | filtr: ${diaryFilter}`, 'ok');
 
   if (!visibleData.length) {
-    const label = diaryFilter === 'product' ? 'Zatim zadny zaznam pro vybrany produkt.' : 'Zatim zadny zaznam v deniku.';
+    const label = diaryFilter === 'product' ? 'Zatím žádný záznam pro vybraný produkt.' : 'Zatím žádný záznam v deníku.';
     el.innerHTML = `<div class="card muted">${label}</div>`;
     updateDiaryFilterButtons();
     return;
@@ -2490,7 +2559,7 @@ async function loadDiary() {
 
 async function addDiaryEntry() {
   const content = document.getElementById('diaryContent').value.trim();
-  if (!content) return alert('Napis text');
+  if (!content) return alert('Napiš text');
 
   try {
     await apiPost('/diary', {
@@ -2506,7 +2575,7 @@ async function addDiaryEntry() {
     await loadWarrantyAlerts();
     await loadWatcherMinimum();
     await loadSelectedProductSummary();
-    setDiaryStatus('Zaznam ulozen.', 'ok');
+    setDiaryStatus('Záznam uložen.', 'ok');
   } catch (e) {
     setDiaryStatus(`MISS: ${e.message}`, 'miss');
     alert(`MISS: ${e.message}`);
@@ -2514,6 +2583,7 @@ async function addDiaryEntry() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initAppShell();
   restoreTriagePrefs();
   restoreDeferredDocumentIds();
   document.getElementById('productForm').addEventListener('submit', createProduct);
@@ -2537,13 +2607,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   await runBootStep('watch-folder', loadWatchFolderMedia, (error) => setPhotoStatus(`MISS watch-folder: ${error.message}`, 'miss'));
   await runBootStep('diary selects', loadDiarySelects, (error) => setDiaryStatus(`MISS selects: ${error.message}`, 'miss'));
   await runBootStep('diary', loadDiary, (error) => setDiaryStatus(`MISS: ${error.message}`, 'miss'));
-  await runBootStep('zaruky', loadWarrantyDashboard);
+  await runBootStep('záruky', loadWarrantyDashboard);
   await runBootStep('upozorneni', loadWarrantyAlerts);
   await runBootStep('watcher', loadWatcherMinimum, (error) => {
     const el = document.getElementById('watcherSummary');
     if (el) el.textContent = `MISS: ${error.message}`;
   });
-  await runBootStep('vybrany produkt', loadSelectedProductSummary);
+  await runBootStep('vybraný produkt', loadSelectedProductSummary);
 });
 
 function openLightbox(url) {

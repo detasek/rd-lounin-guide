@@ -878,3 +878,33 @@ Deploy po teto zmene:
 - na NAS spustit `docker compose up -d --force-recreate frontend backend`
 - overit `curl -s http://localhost:8091/api/status`
 - v Cloudflare podle potreby `Purge Everything`
+
+---
+
+## WEB APP UI CHECKPOINT (2026-05-07)
+
+Frontend byl posunut z dlouhe prototypove stranky smerem k webove aplikaci:
+- `app/index.html` ma app-shell s postranni navigaci pro PC.
+- Hlavni workflow je rozdelene do sekci:
+  - Prehled
+  - Produkty
+  - Dokumenty
+  - Faktury
+  - Media
+  - Denik
+  - Watcher
+- `app/styles.css` obsahuje svetle/tmave tema pres CSS promenne.
+- `app/app.js` uklada tema do `localStorage` pod `rd-lounin-theme-v1`.
+- `app/app.js` uklada layout rezim do `localStorage` pod `rd-lounin-layout-v1`.
+- Zachovane zustaly puvodni ID formularu a seznamu, aby zustalo funkcni stavajici API napojeni.
+- Viditelny staticky shell je v cestine s diakritikou a UTF-8.
+- `scripts/smoke-check.js` kontroluje:
+  - cesky UTF-8 title
+  - pritomnost app-shellu
+  - pritomnost theme toggle
+  - absence typickych mojibake sekvenci
+
+Deploy poznamka:
+- API zustava same-origin pres `/api`.
+- Cloudflare ma smerovat na frontend `http://SYNOLOGY_IP:8091`.
+- Po nasazeni je stale nutny `docker compose up -d --force-recreate frontend backend`.

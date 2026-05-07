@@ -3,207 +3,285 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Pruvodce stavbou RD Lounin</title>
+  <meta name="theme-color" content="#f7f8fb">
+  <title>Průvodce stavbou RD Lounín</title>
   <link rel="stylesheet" href="styles.css?v=dev">
 </head>
 <body>
-  <h1>Pruvodce stavbou RD Lounin</h1>
-
-  <section>
-    <h2>API stav</h2>
-    <pre id="apiStatus">Nacitam...</pre>
-  </section>
-
-  <section>
-    <h2>Novy produkt</h2>
-    <form id="productForm">
-      <input id="name" placeholder="Nazev produktu" required>
-      <textarea id="description" placeholder="Popis"></textarea>
-      <button type="submit">Ulozit</button>
-    </form>
-    <div id="productTemplateStatus" class="muted">Rychly start produktu: pripraven.</div>
-    <div class="row-actions">
-      <button type="button" class="ghost-btn" onclick="createStarterProducts('top8')">Zalozit prvnich 8</button>
-      <button type="button" class="ghost-btn" onclick="createStarterProducts('all16')">Zalozit vsech 16</button>
-    </div>
-  </section>
-
-  <section>
-    <h2>Seznam produktu</h2>
-    <div id="productsList"></div>
-  </section>
-
-  <section>
-    <h2>Vybrany produkt</h2>
-    <div id="selectedProductSummary" class="muted">Vyber produkt.</div>
-    <div id="selectedProductGuide" class="muted">Zarazeni: -</div>
-    <div id="selectedProductHealth" class="muted">Stav produktu: -</div>
-    <div id="selectedProductIssues" class="muted">K reseni: -</div>
-    <div id="selectedProductNext" class="muted">Dalsi krok: -</div>
-    <div id="selectedProductCompletion" class="muted">Hotovost: -</div>
-    <div id="selectedProductChecklist" class="muted">Checklist: -</div>
-    <div class="row-actions">
-      <button type="button" class="ghost-btn" onclick="openProductDocuments()">Dokumenty</button>
-      <button type="button" class="ghost-btn" onclick="openProductReceipts()">Receipts</button>
-      <button type="button" class="ghost-btn" onclick="openProductMedia()">Media</button>
-      <button type="button" class="ghost-btn" onclick="openProductDiary()">Denik</button>
-    </div>
-    <div class="row-actions">
-      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('pending')">Receipt pending</button>
-      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('review')">OCR review</button>
-      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('missing_document_number')">Chybi doklad</button>
-      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('missing_supplier')">Chybi dodavatel</button>
-      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('missing_purchase_date')">Chybi datum</button>
-      <button type="button" class="ghost-btn" onclick="focusWatchFolder()">Inbox</button>
-    </div>
-  </section>
-
-  <section>
-    <h2>Dokumenty</h2>
-    <div id="documentSummary" class="muted">Documents: -</div>
-    <div id="documentStatus" class="muted">Pripraveno.</div>
-    <div class="row-actions">
-      <button type="button" class="ghost-btn" id="document-scope-selected" onclick="setDocumentScope('selected')">Vybrany produkt</button>
-      <button type="button" class="ghost-btn" id="document-scope-all" onclick="setDocumentScope('all')">Vsechny produkty</button>
-    </div>
-    <div class="row-actions">
-      <input id="documentSearch" placeholder="Hledat v dokumentech..." oninput="setDocumentSearch(this.value)">
-      <button type="button" class="ghost-btn" onclick="clearDocumentSearch()">Vymazat hledani</button>
-      <button type="button" class="ghost-btn" onclick="copyVisibleDocumentsList()">Kopirovat seznam</button>
-      <select id="documentSort" onchange="setDocumentSort(this.value)">
-        <option value="newest">Nejnovejsi</option>
-        <option value="oldest">Nejstarsi</option>
-        <option value="name">Nazev A-Z</option>
-        <option value="suggested-first">Doporucene nahoru</option>
-        <option value="unsorted-first">Bez navrhu nahoru</option>
-      </select>
-    </div>
-    <div class="row-actions">
-      <button type="button" class="ghost-btn" id="document-filter-all" onclick="setDocumentFilter('all')">Vse</button>
-      <button type="button" class="ghost-btn" id="document-filter-pdf" onclick="setDocumentFilter('pdf')">PDF</button>
-      <button type="button" class="ghost-btn" id="document-filter-image" onclick="setDocumentFilter('image')">Obrazky</button>
-      <button type="button" class="ghost-btn" id="document-filter-other" onclick="setDocumentFilter('other')">Ostatni</button>
-      <button type="button" class="ghost-btn" id="document-filter-todo" onclick="setDocumentFilter('todo')">K reseni</button>
-      <button type="button" class="ghost-btn" id="document-filter-suggested" onclick="setDocumentFilter('suggested')">Doporucene</button>
-      <button type="button" class="ghost-btn" id="document-filter-unsorted" onclick="setDocumentFilter('unsorted')">Bez navrhu</button>
-      <button type="button" class="ghost-btn" id="document-filter-deferred" onclick="setDocumentFilter('deferred')">Odlozene</button>
-      <button type="button" class="ghost-btn" onclick="moveAllSuggestedDocuments()">Presunout vse doporucene</button>
-      <button type="button" class="ghost-btn" onclick="moveVisibleSuggestedDocuments()">Presunout viditelne doporucene</button>
-      <button type="button" class="ghost-btn" onclick="deferAllVisibleActionableDocuments()">Odlozit viditelne k reseni</button>
-      <button type="button" class="ghost-btn" onclick="undeferAllVisibleDocuments()">Vratit viditelne odlozene</button>
-      <select id="document-unsorted-target"></select>
-      <button type="button" class="ghost-btn" onclick="moveAllUnsortedDocuments()">Zaradit vse bez navrhu</button>
-    </div>
-    <div class="row-actions">
-      <select id="document-visible-target"></select>
-      <button type="button" class="ghost-btn" onclick="moveVisibleDocumentsToTarget()">Zaradit viditelne</button>
-    </div>
-    <div id="documentSuggestions" class="muted">Navrhy trideni: -</div>
-    <div id="documentTriageSummary" class="muted">Rozlozeni: -</div>
-    <div id="documentWorkbench" class="muted">Workbench: -</div>
-    <div id="documentsList"></div>
-    <form id="documentForm">
-      <input id="documentName" placeholder="nazev dokumentu pro single upload (volitelne)">
-      <label class="muted" for="documentFile">Vyber vice souboru</label>
-      <input id="documentFile" type="file" multiple>
-      <label class="muted" for="documentFolder">Nebo vyber slozku</label>
-      <input id="documentFolder" type="file" multiple webkitdirectory directory>
-      <button type="submit">Nahrat dokumenty</button>
-    </form>
-  </section>
-
-  <section>
-    <h2>Faktury / Uctenky</h2>
-    <div class="toolbar">
-      <div id="receiptSelectedProduct" class="muted">Produkt: vse</div>
-      <div class="filter-row">
-        <button type="button" class="ghost-btn" onclick="setReceiptFilter('all')">Vse</button>
-        <button type="button" class="ghost-btn" onclick="setReceiptFilter('green')">V zaruce</button>
-        <button type="button" class="ghost-btn" onclick="setReceiptFilter('orange')">Konci</button>
-        <button type="button" class="ghost-btn" onclick="setReceiptFilter('red')">Po zaruce</button>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Hlavní navigace">
+      <div class="brand-block">
+        <div class="brand-mark">RD</div>
+        <div>
+          <div class="eyebrow">RD Lounín</div>
+          <h1>Průvodce stavbou</h1>
+        </div>
       </div>
-      <div id="receiptSummary" class="muted">Nacitam receipts...</div>
-      <div id="receiptStatus" class="muted" aria-live="polite"></div>
-    </div>
-    <div id="receiptsList"></div>
-    <form id="receiptForm">
-      <input id="receiptTitle" placeholder="nazev faktury / uctenky">
-      <input id="receiptFile" type="file" accept="application/pdf,image/*">
-      <button type="submit">Pridat fakturu / uctenku</button>
-    </form>
-  </section>
-
-  <section>
-    <h2>Zaruky</h2>
-    <h2>Upozorneni</h2>
-    <div id="warrantyAlerts"></div>
-    <div id="warrantyDashboard"></div>
-  </section>
-
-  <section>
-    <h2>Watcher minimum</h2>
-    <div id="watcherSummary" class="muted">Nacitam watcher...</div>
-    <div class="row-actions">
-      <button type="button" class="ghost-btn" onclick="openProductReceipts()">Receipts</button>
-      <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('review')">OCR review</button>
-      <button type="button" class="ghost-btn" onclick="focusWatchFolder()">Inbox</button>
-    </div>
-    <div id="watcherList"></div>
-  </section>
-
-  <section>
-    <h2>Fotky</h2>
-    <form id="photoForm">
-      <input type="file" id="photoInput" accept="image/*,video/*">
-      <button type="submit">Nahrat foto / video</button>
-    </form>
-    <div id="photoStatus" class="muted" aria-live="polite"></div>
-    <div id="photoSummary" class="muted">Media summary: -</div>
-    <div class="row-actions">
-      <button type="button" class="ghost-btn" id="media-filter-all" onclick="setMediaFilter('all')">Vse</button>
-      <button type="button" class="ghost-btn" id="media-filter-image" onclick="setMediaFilter('image')">Obrazky</button>
-      <button type="button" class="ghost-btn" id="media-filter-video" onclick="setMediaFilter('video')">Videa</button>
-    </div>
-    <div class="card">
-      <b>Watch folder media</b>
-      <div class="muted" id="watchFolderHint">Sleduji /data/watch-folder/media</div>
-      <div class="row-actions">
-        <button type="button" class="ghost-btn" onclick="loadWatchFolderMedia()">Obnovit inbox</button>
-        <button type="button" class="ghost-btn" onclick="importAllWatchFolderMedia()">Import vse do produktu</button>
+      <nav class="main-nav">
+        <button type="button" class="nav-link active" data-section="overviewSection">Přehled</button>
+        <button type="button" class="nav-link" data-section="productsSection">Produkty</button>
+        <button type="button" class="nav-link" data-section="documentsSection">Dokumenty</button>
+        <button type="button" class="nav-link" data-section="receiptsSection">Faktury</button>
+        <button type="button" class="nav-link" data-section="mediaSection">Média</button>
+        <button type="button" class="nav-link" data-section="diarySection">Deník</button>
+        <button type="button" class="nav-link" data-section="watcherSection">Watcher</button>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="status-dot"></span>
+        <span>Cloudflare Access</span>
       </div>
-      <div id="watchFolderMedia"></div>
-    </div>
-    <div id="photosGrid"></div>
-  </section>
+    </aside>
 
-  <section>
-    <h2>Stavebni denik</h2>
-    <div class="toolbar">
-      <div class="muted">Rychly zapis k produktu nebo fazi.</div>
-      <div id="diaryStatus" class="muted" aria-live="polite"></div>
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Stavební operační systém</p>
+          <h2>RD Lounín</h2>
+        </div>
+        <div class="top-actions">
+          <button type="button" class="icon-btn" id="layoutToggle" title="Přepnout hustotu zobrazení" aria-label="Přepnout hustotu zobrazení">PC</button>
+          <button type="button" class="theme-toggle" id="themeToggle" aria-label="Přepnout světlé/tmavé téma" aria-pressed="false">
+            <span></span>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section id="overviewSection" class="panel hero-panel">
+          <div>
+            <p class="eyebrow">Přehled</p>
+            <h2>Stav aplikace a vybraný produkt</h2>
+          </div>
+          <div class="overview-grid">
+            <div class="metric-card">
+              <h3>API stav</h3>
+              <pre id="apiStatus">Načítám...</pre>
+            </div>
+            <div class="metric-card selected-product-card">
+              <h3>Vybraný produkt</h3>
+              <div id="selectedProductSummary" class="muted">Vyber produkt.</div>
+              <div id="selectedProductGuide" class="muted">Zařazení: -</div>
+              <div id="selectedProductHealth" class="muted">Stav produktu: -</div>
+              <div id="selectedProductIssues" class="muted">K řešení: -</div>
+              <div id="selectedProductNext" class="muted">Další krok: -</div>
+              <div id="selectedProductCompletion" class="muted">Hotovost: -</div>
+              <div id="selectedProductChecklist" class="muted">Checklist: -</div>
+            </div>
+          </div>
+          <div class="row-actions">
+            <button type="button" class="ghost-btn" onclick="openProductDocuments()">Dokumenty</button>
+            <button type="button" class="ghost-btn" onclick="openProductReceipts()">Faktury</button>
+            <button type="button" class="ghost-btn" onclick="openProductMedia()">Média</button>
+            <button type="button" class="ghost-btn" onclick="openProductDiary()">Deník</button>
+            <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('pending')">Faktury ke kontrole</button>
+            <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('review')">OCR review</button>
+            <button type="button" class="ghost-btn" onclick="focusWatchFolder()">Inbox</button>
+          </div>
+        </section>
+
+        <section id="productsSection" class="panel">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Produkty a stavební okruhy</p>
+              <h2>Produkty</h2>
+            </div>
+          </div>
+          <div class="split-grid">
+            <form id="productForm" class="form-panel">
+              <h3>Nový produkt</h3>
+              <input id="name" placeholder="Název produktu" required>
+              <textarea id="description" placeholder="Popis"></textarea>
+              <button type="submit">Uložit</button>
+              <div id="productTemplateStatus" class="muted">Rychlý start produktu: připraven.</div>
+              <div class="row-actions">
+                <button type="button" class="ghost-btn" onclick="createStarterProducts('top8')">Založit prvních 8</button>
+                <button type="button" class="ghost-btn" onclick="createStarterProducts('all16')">Založit všech 16</button>
+              </div>
+            </form>
+            <div class="list-panel">
+              <h3>Seznam produktů</h3>
+              <div id="productsList"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="documentsSection" class="panel">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Triage a dokumentace</p>
+              <h2>Dokumenty</h2>
+              <div id="documentSummary" class="muted">Dokumenty: -</div>
+            </div>
+            <div id="documentStatus" class="muted">Připraveno.</div>
+          </div>
+          <div class="toolbar">
+            <div class="row-actions">
+              <button type="button" class="ghost-btn" id="document-scope-selected" onclick="setDocumentScope('selected')">Vybraný produkt</button>
+              <button type="button" class="ghost-btn" id="document-scope-all" onclick="setDocumentScope('all')">Všechny produkty</button>
+            </div>
+            <div class="row-actions">
+              <input id="documentSearch" placeholder="Hledat v dokumentech..." oninput="setDocumentSearch(this.value)">
+              <button type="button" class="ghost-btn" onclick="clearDocumentSearch()">Vymazat hledání</button>
+              <button type="button" class="ghost-btn" onclick="copyVisibleDocumentsList()">Kopírovat seznam</button>
+              <select id="documentSort" onchange="setDocumentSort(this.value)">
+                <option value="newest">Nejnovější</option>
+                <option value="oldest">Nejstarší</option>
+                <option value="name">Název A-Z</option>
+                <option value="suggested-first">Doporučené nahoru</option>
+                <option value="unsorted-first">Bez návrhu nahoru</option>
+              </select>
+            </div>
+            <div class="row-actions">
+              <button type="button" class="ghost-btn" id="document-filter-all" onclick="setDocumentFilter('all')">Vše</button>
+              <button type="button" class="ghost-btn" id="document-filter-pdf" onclick="setDocumentFilter('pdf')">PDF</button>
+              <button type="button" class="ghost-btn" id="document-filter-image" onclick="setDocumentFilter('image')">Obrázky</button>
+              <button type="button" class="ghost-btn" id="document-filter-other" onclick="setDocumentFilter('other')">Ostatní</button>
+              <button type="button" class="ghost-btn" id="document-filter-todo" onclick="setDocumentFilter('todo')">K řešení</button>
+              <button type="button" class="ghost-btn" id="document-filter-suggested" onclick="setDocumentFilter('suggested')">Doporučené</button>
+              <button type="button" class="ghost-btn" id="document-filter-unsorted" onclick="setDocumentFilter('unsorted')">Bez návrhu</button>
+              <button type="button" class="ghost-btn" id="document-filter-deferred" onclick="setDocumentFilter('deferred')">Odložené</button>
+            </div>
+            <div class="row-actions">
+              <button type="button" class="ghost-btn" onclick="moveAllSuggestedDocuments()">Přesunout vše doporučené</button>
+              <button type="button" class="ghost-btn" onclick="moveVisibleSuggestedDocuments()">Přesunout viditelné doporučené</button>
+              <button type="button" class="ghost-btn" onclick="deferAllVisibleActionableDocuments()">Odložit viditelné k řešení</button>
+              <button type="button" class="ghost-btn" onclick="undeferAllVisibleDocuments()">Vrátit viditelné odložené</button>
+              <select id="document-unsorted-target"></select>
+              <button type="button" class="ghost-btn" onclick="moveAllUnsortedDocuments()">Zařadit vše bez návrhu</button>
+            </div>
+            <div class="row-actions">
+              <select id="document-visible-target"></select>
+              <button type="button" class="ghost-btn" onclick="moveVisibleDocumentsToTarget()">Zařadit viditelné</button>
+            </div>
+          </div>
+          <div id="documentSuggestions" class="muted">Návrhy třídění: -</div>
+          <div id="documentTriageSummary" class="muted">Rozložení: -</div>
+          <div id="documentWorkbench" class="muted">Workbench: -</div>
+          <div id="documentsList"></div>
+          <form id="documentForm" class="form-panel">
+            <h3>Nahrát dokumenty</h3>
+            <input id="documentName" placeholder="Název dokumentu pro single upload (volitelné)">
+            <label class="muted" for="documentFile">Vyber více souborů</label>
+            <input id="documentFile" type="file" multiple>
+            <label class="muted" for="documentFolder">Nebo vyber složku</label>
+            <input id="documentFolder" type="file" multiple webkitdirectory directory>
+            <button type="submit">Nahrát dokumenty</button>
+          </form>
+        </section>
+
+        <section id="receiptsSection" class="panel">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Záruky a doklady</p>
+              <h2>Faktury / účtenky</h2>
+              <div id="receiptSelectedProduct" class="muted">Produkt: vše</div>
+            </div>
+            <div id="receiptStatus" class="muted" aria-live="polite"></div>
+          </div>
+          <div class="toolbar">
+            <div class="filter-row">
+              <button type="button" class="ghost-btn" onclick="setReceiptFilter('all')">Vše</button>
+              <button type="button" class="ghost-btn" onclick="setReceiptFilter('green')">V záruce</button>
+              <button type="button" class="ghost-btn" onclick="setReceiptFilter('orange')">Končí</button>
+              <button type="button" class="ghost-btn" onclick="setReceiptFilter('red')">Po záruce</button>
+            </div>
+            <div id="receiptSummary" class="muted">Načítám faktury...</div>
+          </div>
+          <div id="receiptsList"></div>
+          <form id="receiptForm" class="form-panel">
+            <h3>Přidat fakturu / účtenku</h3>
+            <input id="receiptTitle" placeholder="Název faktury / účtenky">
+            <input id="receiptFile" type="file" accept="application/pdf,image/*">
+            <button type="submit">Přidat fakturu / účtenku</button>
+          </form>
+        </section>
+
+        <section id="mediaSection" class="panel">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Fotodokumentace</p>
+              <h2>Média</h2>
+              <div id="photoSummary" class="muted">Media summary: -</div>
+            </div>
+            <div id="photoStatus" class="muted" aria-live="polite"></div>
+          </div>
+          <form id="photoForm" class="form-panel">
+            <h3>Nahrát foto / video</h3>
+            <input type="file" id="photoInput" accept="image/*,video/*">
+            <button type="submit">Nahrát foto / video</button>
+          </form>
+          <div class="row-actions">
+            <button type="button" class="ghost-btn" id="media-filter-all" onclick="setMediaFilter('all')">Vše</button>
+            <button type="button" class="ghost-btn" id="media-filter-image" onclick="setMediaFilter('image')">Obrázky</button>
+            <button type="button" class="ghost-btn" id="media-filter-video" onclick="setMediaFilter('video')">Videa</button>
+          </div>
+          <div class="card">
+            <b>Watch folder media</b>
+            <div class="muted" id="watchFolderHint">Sleduji /data/watch-folder/media</div>
+            <div class="row-actions">
+              <button type="button" class="ghost-btn" onclick="loadWatchFolderMedia()">Obnovit inbox</button>
+              <button type="button" class="ghost-btn" onclick="importAllWatchFolderMedia()">Import vše do produktu</button>
+            </div>
+            <div id="watchFolderMedia"></div>
+          </div>
+          <div id="photosGrid"></div>
+        </section>
+
+        <section id="diarySection" class="panel">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Stavební deník</p>
+              <h2>Deník</h2>
+              <div class="muted">Rychlý zápis k produktu nebo fázi.</div>
+            </div>
+            <div id="diaryStatus" class="muted" aria-live="polite"></div>
+          </div>
+          <div class="row-actions">
+            <button type="button" class="ghost-btn" id="diary-filter-all" onclick="setDiaryFilter('all')">Vše</button>
+            <button type="button" class="ghost-btn" id="diary-filter-product" onclick="setDiaryFilter('product')">Vybraný produkt</button>
+          </div>
+          <div id="diaryForm" class="form-panel">
+            <label>Produkt</label>
+            <select id="diaryProduct"></select>
+            <label>Fáze</label>
+            <select id="diaryPhase"></select>
+            <textarea id="diaryContent" placeholder="Co se dnes dělalo..."></textarea>
+            <button type="button" onclick="addDiaryEntry()">Uložit</button>
+          </div>
+          <div id="diaryList"></div>
+        </section>
+
+        <section id="watcherSection" class="panel">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Kontrola a upozornění</p>
+              <h2>Watcher</h2>
+              <div id="watcherSummary" class="muted">Načítám watcher...</div>
+            </div>
+          </div>
+          <div class="row-actions">
+            <button type="button" class="ghost-btn" onclick="openProductReceipts()">Faktury</button>
+            <button type="button" class="ghost-btn" onclick="focusSelectedReceiptIssue('review')">OCR review</button>
+            <button type="button" class="ghost-btn" onclick="focusWatchFolder()">Inbox</button>
+          </div>
+          <div id="watcherList"></div>
+          <div class="subsection">
+            <h3>Záruky a upozornění</h3>
+            <div id="warrantyAlerts"></div>
+            <div id="warrantyDashboard"></div>
+          </div>
+        </section>
+      </main>
     </div>
-    <div class="row-actions">
-      <button type="button" class="ghost-btn" id="diary-filter-all" onclick="setDiaryFilter('all')">Vse</button>
-      <button type="button" class="ghost-btn" id="diary-filter-product" onclick="setDiaryFilter('product')">Vybrany produkt</button>
-    </div>
-    <div id="diaryForm">
-      <label>Produkt</label><br>
-      <select id="diaryProduct"></select><br><br>
-      <label>Faze</label><br>
-      <select id="diaryPhase"></select><br><br>
-      <textarea id="diaryContent" placeholder="Co se dnes delalo..."></textarea><br>
-      <button type="button" onclick="addDiaryEntry()">Ulozit</button>
-    </div>
-    <div id="diaryList"></div>
-  </section>
+  </div>
+
+  <div id="lightbox" class="lightbox" aria-hidden="true">
+    <button id="lightboxClose" type="button" class="ghost-btn lightbox-close">Zavřít</button>
+    <img id="lightboxImg" alt="Náhled média">
+    <video id="lightboxVideo" controls></video>
+  </div>
 
   <script src="config.js?v=dev"></script>
   <script src="app.js?v=dev"></script>
-
-  <div id="lightbox" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000c;justify-content:center;align-items:center;z-index:9999;">
-    <button id="lightboxClose" type="button" class="ghost-btn" style="position:absolute;top:16px;right:16px;z-index:10000;">Zavrit</button>
-    <img id="lightboxImg" style="display:none;max-width:95%;max-height:95%;">
-    <video id="lightboxVideo" controls style="display:none;max-width:95%;max-height:95%;border-radius:12px;background:#000;"></video>
-  </div>
 </body>
 </html>

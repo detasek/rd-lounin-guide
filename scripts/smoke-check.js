@@ -55,6 +55,9 @@ function checkFrontendFiles() {
   }
   if (!/<script\s+src="config\.js(?:\?[^"]*)?"><\/script>/.test(html)) fail('index.html must load config.js');
   if (!/<script\s+src="app\.js(?:\?[^"]*)?"><\/script>/.test(html)) fail('index.html must load app.js');
+  if (!html.includes('Průvodce stavbou RD Lounín')) fail('index.html must keep Czech UTF-8 title');
+  if (!html.includes('class="app-shell"')) fail('index.html must render the web app shell');
+  if (!html.includes('id="themeToggle"')) fail('index.html must expose the theme toggle');
 
   const config = read('app/config.js');
   if (!config.includes("API_BASE: '/api'")) {
@@ -68,6 +71,7 @@ function checkFrontendFiles() {
   if (/API_BASE\.replace\('/.test(appJs)) {
     fail('app.js must derive file URLs through centralized helpers');
   }
+  if (!appJs.includes('function initAppShell()')) fail('app.js must initialize the web app shell');
 
   const nginxConfig = read('app/nginx.conf');
   if (!nginxConfig.includes('proxy_pass http://backend:3000/api/')) fail('nginx.conf must proxy /api to backend');
@@ -93,6 +97,7 @@ function checkDriftSignals() {
     const source = fs.readFileSync(file.fullPath, 'utf8');
     if (/192\.168\.\d+\.\d+/.test(source)) fail(`hard-coded LAN IP found: ${file.rel}`);
     if (/D:\\rd-lounin-guide/i.test(source)) fail(`old D: workspace path found: ${file.rel}`);
+    if (/[\u0102\u0139\u00c4\u00c5]|\u00e2[^\n]{0,2}/.test(source)) fail(`probable mojibake found: ${file.rel}`);
   }
 
   const photosRoute = read('api/routes/photos.js');
