@@ -50,6 +50,9 @@ function checkFrontendFiles() {
   }
 
   const html = read('app/index.html');
+  if (!/<link\s+rel="stylesheet"\s+href="styles\.css(?:\?[^"]*)?">/.test(html)) {
+    fail('index.html must load styles.css');
+  }
   if (!/<script\s+src="config\.js"><\/script>/.test(html)) fail('index.html must load config.js');
   if (!/<script\s+src="app\.js(?:\?[^"]*)?"><\/script>/.test(html)) fail('index.html must load app.js');
 }
