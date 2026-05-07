@@ -859,3 +859,22 @@ Cloudflare postup:
 Poznamka:
 - Pro lokalni LAN pristup dal funguje `http://SYNOLOGY_IP:8091`.
 - Pres Cloudflare se nema pouzivat port `3010`; vse jde pres jednu HTTPS domenu a Nginx proxy.
+
+---
+
+## CLOUDFLARE CACHE HARDENING CHECKPOINT (2026-05-07)
+
+Po produkcnim testu pres `stavba.detasek.cz` byl doplnen cache hardening:
+- `app/index.html` nacita `styles.css`, `config.js` a `app.js` s query verzi.
+- `scripts/build-deploy-package.ps1` pri stavbe deploy baliku prepise query verzi na aktualni git hash.
+- `app/nginx.conf` posila no-cache hlavicky pro `index.html`, `config.js`, `app.js` a `styles.css`.
+- `app/app.js` centralizuje skladani API URL pres `apiUrl()`.
+- `app/app.js` centralizuje skladani `/files` URL pres `fileUrl()`.
+- HTTPS pojistka v `resolveApiBase()` prepne stare same-host absolutni `:3010/api` konfigurace na `/api`.
+- `scripts/smoke-check.js` hlida, aby se nevratilo prime `fetch(`${API_BASE}...`)` a stare skladani file URL pres `API_BASE.replace('/api', '')`.
+
+Deploy po teto zmene:
+- nasadit novy deploy ZIP bez `data/`
+- na NAS spustit `docker compose up -d --force-recreate frontend backend`
+- overit `curl -s http://localhost:8091/api/status`
+- v Cloudflare podle potreby `Purge Everything`

@@ -61,6 +61,14 @@ function checkFrontendFiles() {
     fail('config.js must use same-origin API_BASE for Synology/Cloudflare deployment');
   }
 
+  const appJs = read('app/app.js');
+  if (/fetch\(`\$\{API_BASE/.test(appJs)) {
+    fail('app.js must build fetch URLs through apiUrl()');
+  }
+  if (/API_BASE\.replace\('/.test(appJs)) {
+    fail('app.js must derive file URLs through centralized helpers');
+  }
+
   const nginxConfig = read('app/nginx.conf');
   if (!nginxConfig.includes('proxy_pass http://backend:3000/api/')) fail('nginx.conf must proxy /api to backend');
   if (!nginxConfig.includes('proxy_pass http://backend:3000/files/')) fail('nginx.conf must proxy /files to backend');

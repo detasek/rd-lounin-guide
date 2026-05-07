@@ -11,6 +11,19 @@ function resolveApiBase() {
 }
 
 const API_BASE = resolveApiBase();
+const APP_BASE = resolveAppBase(API_BASE);
+
+function resolveAppBase(apiBase) {
+  return apiBase.replace(/\/api\/?$/, '');
+}
+
+function apiUrl(path) {
+  return `${API_BASE}${path}`;
+}
+
+function fileUrl(filePath) {
+  return `${APP_BASE}/files${filePath}`;
+}
 
 let productsMap = {};
 let phasesMap = {};
@@ -175,7 +188,7 @@ async function parseJsonResponse(response, label) {
 }
 
 async function apiGet(path) {
-  const response = await fetch(`${API_BASE}${path}`);
+  const response = await fetch(apiUrl(path));
   return parseJsonResponse(response, `GET ${path}`);
 }
 
@@ -185,12 +198,12 @@ async function apiPost(path, data) {
     options.headers = { 'Content-Type': 'application/json' };
     options.body = JSON.stringify(data);
   }
-  const response = await fetch(`${API_BASE}${path}`, options);
+  const response = await fetch(apiUrl(path), options);
   return parseJsonResponse(response, `POST ${path}`);
 }
 
 async function apiPut(path, data) {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(apiUrl(path), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -199,7 +212,7 @@ async function apiPut(path, data) {
 }
 
 async function apiDelete(path) {
-  const response = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
+  const response = await fetch(apiUrl(path), { method: 'DELETE' });
   return parseJsonResponse(response, `DELETE ${path}`);
 }
 
@@ -1127,7 +1140,7 @@ async function loadDocuments() {
   }
 
   visibleDocs.forEach((doc) => {
-    const url = `${API_BASE.replace('/api', '')}/files${doc.file_path}`;
+    const url = fileUrl(doc.file_path);
     const isPdf = (doc.mime_type || '').includes('pdf') || (doc.name || '').toLowerCase().endsWith('.pdf');
     const isImg = (doc.mime_type || '').includes('image');
     const shouldOpenEditor = openDocumentEditorId === doc.id;
@@ -1642,7 +1655,7 @@ async function uploadDocument(e) {
     fd.append('files', file);
   });
 
-  const response = await fetch(`${API_BASE}/documents/upload`, {
+  const response = await fetch(apiUrl('/documents/upload'), {
     method: 'POST',
     body: fd
   });
@@ -1739,7 +1752,7 @@ async function loadWarrantyDashboard() {
   }
 
   el.innerHTML = items.map((receipt) => {
-    const url = `${API_BASE.replace('/api', '')}/files${receipt.file_path}`;
+    const url = fileUrl(receipt.file_path);
     return `
       <div class="card">
         <a href="#" onclick="openMediaViewer('${url}', 'application/pdf');return false;">
@@ -1772,7 +1785,7 @@ async function loadWarrantyAlerts() {
   }
 
   el.innerHTML = alerts.map((receipt) => {
-    const url = `${API_BASE.replace('/api', '')}/files${receipt.file_path}`;
+    const url = fileUrl(receipt.file_path);
     return `
       <div class="card">
         [!] <a href="#" onclick="openMediaViewer('${url}', 'application/pdf');return false;">
@@ -1941,7 +1954,7 @@ async function focusSelectedReceiptIssue(mode) {
 function qrUrl(id) {
   const base = window.location.origin;
   const data = encodeURIComponent(base + '/receipt/' + id);
-  return `${API_BASE}/qr?size=80&data=${data}`;
+  return apiUrl(`/qr?size=80&data=${data}`);
 }
 
 function esc(v) {
@@ -2030,7 +2043,7 @@ async function loadReceipts() {
   }
 
   visibleReceipts.forEach((receipt) => {
-    const url = `${API_BASE.replace('/api', '')}/files${receipt.file_path}`;
+    const url = fileUrl(receipt.file_path);
     const name = receipt.title || receipt.original_name || receipt.file_path;
     const warranty = getWarrantyStatus(receipt.warranty_until);
     const isPdf = (receipt.mime_type || '').includes('pdf') || name.toLowerCase().endsWith('.pdf');
@@ -2135,7 +2148,7 @@ async function uploadReceipt(e) {
   fd.append('file', file);
 
   try {
-    const response = await fetch(`${API_BASE}/receipts/upload`, {
+    const response = await fetch(apiUrl('/receipts/upload'), {
       method: 'POST',
       body: fd
     });
@@ -2215,7 +2228,7 @@ async function loadPhotos() {
   }
 
   visiblePhotos.forEach((photo) => {
-    const url = `${API_BASE.replace('/api', '')}/files${photo.file_path}`;
+    const url = fileUrl(photo.file_path);
     const isVideo = (photo.mime_type || '').startsWith('video/');
     const photoTitle = photo.title || photo.file_path.split('/').pop() || (isVideo ? 'Video' : 'Fotka');
     const createdAt = formatDateTime(photo.created_at || '-');
@@ -2289,7 +2302,7 @@ async function uploadPhoto(e) {
   fd.append('product_id', selectedProductId);
   fd.append('photo', file);
 
-  const response = await fetch(`${API_BASE}/photos/upload`, {
+  const response = await fetch(apiUrl('/photos/upload'), {
     method: 'POST',
     body: fd
   });

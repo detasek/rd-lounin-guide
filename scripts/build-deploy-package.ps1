@@ -51,6 +51,13 @@ foreach ($file in $Files) {
   Copy-Item -Path (Join-Path $RepoRoot $file) -Destination (Join-Path $StageDir $file) -Force
 }
 
+$IndexPath = Join-Path $StageDir "app\index.html"
+$IndexHtml = Get-Content -LiteralPath $IndexPath -Raw
+$IndexHtml = $IndexHtml -replace 'styles\.css\?v=[^"]+', "styles.css?v=$Commit"
+$IndexHtml = $IndexHtml -replace 'config\.js\?v=[^"]+', "config.js?v=$Commit"
+$IndexHtml = $IndexHtml -replace 'app\.js\?v=[^"]+', "app.js?v=$Commit"
+Set-Content -Path $IndexPath -Value $IndexHtml -Encoding UTF8
+
 $RemovePatterns = @(
   ".git",
   "node_modules",
@@ -80,14 +87,17 @@ Do not overwrite Synology data:
 
 After copying:
 cd /volume1/docker/rd-lounin-guide
-docker compose restart backend frontend
+docker compose up -d --force-recreate frontend backend
 sleep 5
 curl -s http://localhost:3010/api/health
 echo
 curl -s http://localhost:3010/api/status
+echo
+curl -s http://localhost:8091/api/status
 
 Browser:
 http://SYNOLOGY_IP:8091
+https://stavba.detasek.cz
 "@
 
 Set-Content -Path (Join-Path $StageDir "DEPLOY-MANIFEST.txt") -Value $Manifest -Encoding UTF8
