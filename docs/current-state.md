@@ -639,6 +639,7 @@ Stage 2 – STRUKTURA
       - `Odlozene` filter
       - per-document `Odlozit`
       - per-document `Vratit do fronty`
+      - batch `Odlozit viditelne k reseni`
       - batch `Vratit viditelne odlozene`
       - workbench count of deferred documents
       - `Jen odlozene` view in workbench
