@@ -168,12 +168,27 @@ async function apiGet(path) {
 }
 
 async function apiPost(path, data) {
+  const options = { method: 'POST' };
+  if (data !== undefined) {
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = JSON.stringify(data);
+  }
+  const response = await fetch(`${API_BASE}${path}`, options);
+  return parseJsonResponse(response, `POST ${path}`);
+}
+
+async function apiPut(path, data) {
   const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
-  return parseJsonResponse(response, `POST ${path}`);
+  return parseJsonResponse(response, `PUT ${path}`);
+}
+
+async function apiDelete(path) {
+  const response = await fetch(`${API_BASE}${path}`, { method: 'DELETE' });
+  return parseJsonResponse(response, `DELETE ${path}`);
 }
 
 function selectedProductName() {
@@ -579,7 +594,7 @@ async function loadProducts() {
 }
 
 async function deleteProduct(id) {
-  await fetch(`${API_BASE}/products/${id}`, { method: 'DELETE' });
+  await apiDelete(`/products/${id}`);
   if (selectedProductId === id) selectedProductId = null;
   await loadProducts();
   await loadDocuments();
@@ -1183,15 +1198,10 @@ async function moveAllSuggestedDocuments() {
   let moved = 0;
 
   for (const item of candidates) {
-    const response = await fetch(`${API_BASE}/documents/${item.doc.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: item.doc.name,
-        product_id: item.suggestion.productId
-      })
+    await apiPut(`/documents/${item.doc.id}`, {
+      name: item.doc.name,
+      product_id: item.suggestion.productId
     });
-    await parseJsonResponse(response, `PUT /documents/${item.doc.id}`);
     moved += 1;
   }
 
@@ -1214,15 +1224,10 @@ async function moveVisibleSuggestedDocuments() {
   let moved = 0;
 
   for (const doc of visibleDocs) {
-    const response = await fetch(`${API_BASE}/documents/${doc.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: doc.name,
-        product_id: doc._suggestion.productId
-      })
+    await apiPut(`/documents/${doc.id}`, {
+      name: doc.name,
+      product_id: doc._suggestion.productId
     });
-    await parseJsonResponse(response, `PUT /documents/${doc.id}`);
     moved += 1;
   }
 
@@ -1278,15 +1283,10 @@ async function moveAllUnsortedDocuments() {
   let moved = 0;
 
   for (const item of candidates) {
-    const response = await fetch(`${API_BASE}/documents/${item.doc.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: item.doc.name,
-        product_id: targetProductId
-      })
+    await apiPut(`/documents/${item.doc.id}`, {
+      name: item.doc.name,
+      product_id: targetProductId
     });
-    await parseJsonResponse(response, `PUT /documents/${item.doc.id}`);
     moved += 1;
   }
 
@@ -1319,15 +1319,10 @@ async function moveVisibleDocumentsToTarget() {
   let moved = 0;
 
   for (const doc of visibleDocs) {
-    const response = await fetch(`${API_BASE}/documents/${doc.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: doc.name,
-        product_id: targetProductId
-      })
+    await apiPut(`/documents/${doc.id}`, {
+      name: doc.name,
+      product_id: targetProductId
     });
-    await parseJsonResponse(response, `PUT /documents/${doc.id}`);
     moved += 1;
   }
 
@@ -1352,15 +1347,10 @@ async function moveSuggestedDocumentsToProduct(productId, productName) {
   let moved = 0;
 
   for (const item of candidates) {
-    const response = await fetch(`${API_BASE}/documents/${item.doc.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: item.doc.name,
-        product_id: item.suggestion.productId
-      })
+    await apiPut(`/documents/${item.doc.id}`, {
+      name: item.doc.name,
+      product_id: item.suggestion.productId
     });
-    await parseJsonResponse(response, `PUT /documents/${item.doc.id}`);
     moved += 1;
   }
 
@@ -1441,15 +1431,10 @@ async function moveNextUnsortedDocumentToLastTarget() {
     return;
   }
 
-  const response = await fetch(`${API_BASE}/documents/${candidate.id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: candidate.name,
-      product_id: lastManualDocumentProductId
-    })
+  const result = await apiPut(`/documents/${candidate.id}`, {
+    name: candidate.name,
+    product_id: lastManualDocumentProductId
   });
-  const result = await parseJsonResponse(response, `PUT /documents/${candidate.id}`);
   await loadDocuments();
   await loadProducts();
   await loadSelectedProductSummary();
@@ -1525,15 +1510,10 @@ async function saveDocumentName(id) {
   if (!input) return;
 
   try {
-    const response = await fetch(`${API_BASE}/documents/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: input.value,
-        product_id: productInput ? productInput.value : undefined
-      })
+    await apiPut(`/documents/${id}`, {
+      name: input.value,
+      product_id: productInput ? productInput.value : undefined
     });
-    await parseJsonResponse(response, `PUT /documents/${id}`);
     openDocumentEditorId = null;
     await loadDocuments();
     await loadProducts();
@@ -1554,15 +1534,10 @@ async function moveDocumentToSelectedProduct(id) {
   const nameInput = document.getElementById(`document-name-${id}`);
 
   try {
-    const response = await fetch(`${API_BASE}/documents/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: nameInput ? nameInput.value : undefined,
-        product_id: selectedProductId
-      })
+    await apiPut(`/documents/${id}`, {
+      name: nameInput ? nameInput.value : undefined,
+      product_id: selectedProductId
     });
-    await parseJsonResponse(response, `PUT /documents/${id}`);
     openDocumentEditorId = null;
     await loadDocuments();
     await loadProducts();
@@ -1579,15 +1554,10 @@ async function moveDocumentToSuggestedProduct(id, productId, productName) {
   const nameInput = document.getElementById(`document-name-${id}`);
 
   try {
-    const response = await fetch(`${API_BASE}/documents/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: nameInput ? nameInput.value : undefined,
-        product_id: productId
-      })
+    await apiPut(`/documents/${id}`, {
+      name: nameInput ? nameInput.value : undefined,
+      product_id: productId
     });
-    await parseJsonResponse(response, `PUT /documents/${id}`);
     openDocumentEditorId = null;
     await loadDocuments();
     await loadProducts();
@@ -1611,15 +1581,10 @@ async function moveDocumentToQuickProduct(id) {
   try {
     lastManualDocumentProductId = Number(productInput.value);
     saveTriagePrefs();
-    const response = await fetch(`${API_BASE}/documents/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: nameInput ? nameInput.value : undefined,
-        product_id: productInput.value
-      })
+    const result = await apiPut(`/documents/${id}`, {
+      name: nameInput ? nameInput.value : undefined,
+      product_id: productInput.value
     });
-    const result = await parseJsonResponse(response, `PUT /documents/${id}`);
     await loadDocuments();
     await loadProducts();
     await loadSelectedProductSummary();
@@ -1637,7 +1602,7 @@ function togglePreview(id) {
 }
 
 async function deleteDocument(id) {
-  await fetch(`${API_BASE}/documents/${id}`, { method: 'DELETE' });
+  await apiDelete(`/documents/${id}`);
   await loadDocuments();
   await loadSelectedProductSummary();
   setDocumentStatus(`Dokument #${id} smazan.`, 'ok');
@@ -1895,10 +1860,7 @@ async function loadWatcherMinimum() {
 
 async function approveAllReviewNeeded() {
   try {
-    const response = await fetch(`${API_BASE}/receipts/ocr-approve-all-review-needed`, {
-      method: 'POST'
-    });
-    const payload = await parseJsonResponse(response, 'POST /receipts/ocr-approve-all-review-needed');
+    const payload = await apiPost('/receipts/ocr-approve-all-review-needed');
     await loadReceipts();
     await loadWatcherMinimum();
     await loadSelectedProductSummary();
@@ -2116,21 +2078,16 @@ async function loadReceipts() {
 
 async function saveReceipt(id) {
   try {
-    const response = await fetch(`${API_BASE}/receipts/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: document.getElementById(`receipt-title-${id}`).value,
-        supplier: document.getElementById(`receipt-supplier-${id}`).value,
-        document_number: document.getElementById(`receipt-number-${id}`).value,
-        purchase_date: document.getElementById(`receipt-date-${id}`).value,
-        total_amount: document.getElementById(`receipt-total-${id}`).value,
-        warranty_months: document.getElementById(`receipt-warranty-months-${id}`).value,
-        warranty_until: document.getElementById(`receipt-warranty-until-${id}`).value,
-        warranty_note: document.getElementById(`receipt-warranty-note-${id}`).value
-      })
+    await apiPut(`/receipts/${id}`, {
+      title: document.getElementById(`receipt-title-${id}`).value,
+      supplier: document.getElementById(`receipt-supplier-${id}`).value,
+      document_number: document.getElementById(`receipt-number-${id}`).value,
+      purchase_date: document.getElementById(`receipt-date-${id}`).value,
+      total_amount: document.getElementById(`receipt-total-${id}`).value,
+      warranty_months: document.getElementById(`receipt-warranty-months-${id}`).value,
+      warranty_until: document.getElementById(`receipt-warranty-until-${id}`).value,
+      warranty_note: document.getElementById(`receipt-warranty-note-${id}`).value
     });
-    await parseJsonResponse(response, `PUT /receipts/${id}`);
     await loadReceipts();
     setReceiptStatus(`Receipt #${id} ulozen.`, 'ok');
     await loadWatcherMinimum();
@@ -2143,8 +2100,7 @@ async function saveReceipt(id) {
 
 async function deleteReceipt(id) {
   try {
-    const response = await fetch(`${API_BASE}/receipts/${id}`, { method: 'DELETE' });
-    await parseJsonResponse(response, `DELETE /receipts/${id}`);
+    await apiDelete(`/receipts/${id}`);
     await loadReceipts();
     setReceiptStatus(`Receipt #${id} smazan.`, 'ok');
     await loadWatcherMinimum();
@@ -2186,10 +2142,7 @@ async function uploadReceipt(e) {
 
 async function runReceiptOcrMinimum(id) {
   try {
-    const response = await fetch(`${API_BASE}/receipts/${id}/ocr-minimum`, {
-      method: 'POST'
-    });
-    await parseJsonResponse(response, `POST /receipts/${id}/ocr-minimum`);
+    await apiPost(`/receipts/${id}/ocr-minimum`);
     await loadReceipts();
     await loadWatcherMinimum();
     await loadSelectedProductSummary();
@@ -2202,10 +2155,7 @@ async function runReceiptOcrMinimum(id) {
 
 async function approveReceiptOcr(id) {
   try {
-    const response = await fetch(`${API_BASE}/receipts/${id}/ocr-approve`, {
-      method: 'POST'
-    });
-    await parseJsonResponse(response, `POST /receipts/${id}/ocr-approve`);
+    await apiPost(`/receipts/${id}/ocr-approve`);
     await loadReceipts();
     await loadWatcherMinimum();
     await loadSelectedProductSummary();
@@ -2296,12 +2246,7 @@ async function saveMediaTitle(id) {
   if (!input) return;
 
   try {
-    const response = await fetch(`${API_BASE}/photos/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: input.value })
-    });
-    await parseJsonResponse(response, `PUT /photos/${id}`);
+    await apiPut(`/photos/${id}`, { title: input.value });
     openMediaEditorId = null;
     await loadPhotos();
     setPhotoStatus(`Nazev media #${id} ulozen.`, 'ok');
@@ -2314,7 +2259,7 @@ async function saveMediaTitle(id) {
 async function deletePhoto(id) {
   if (!confirm('Smazat fotku?')) return;
 
-  await fetch(`${API_BASE}/photos/${id}`, { method: 'DELETE' });
+  await apiDelete(`/photos/${id}`);
   await loadPhotos();
   await loadWatchFolderMedia();
   await loadSelectedProductSummary();
@@ -2427,10 +2372,7 @@ async function importAllWatchFolderMedia() {
 
 async function deleteWatchFolderMedia(filename) {
   try {
-    const response = await fetch(`${API_BASE}/watch-folder/media?filename=${encodeURIComponent(filename)}`, {
-      method: 'DELETE'
-    });
-    await parseJsonResponse(response, 'DELETE /watch-folder/media');
+    await apiDelete(`/watch-folder/media?filename=${encodeURIComponent(filename)}`);
     await loadWatchFolderMedia();
     await loadWatcherMinimum();
     setPhotoStatus(`Inbox soubor smazan: ${filename}`, 'ok');
